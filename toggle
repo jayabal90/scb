@@ -1,0 +1,155 @@
+import "./toggle.scss";
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { KeyWithAnyModel, StoreModel } from "../../../utils/model/common-model";
+import { fieldIdAppend, isFieldUpdate } from "../../../utils/common/change.utils";
+import { CONSTANTS } from "../../../utils/common/constants";
+
+const Toggel =(props:KeyWithAnyModel)=>{
+    const [defaultCheck,setDefaultCheck]=useState(false);
+    const [error, setError] = useState('');
+    const dispatch = useDispatch();
+    const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
+    const userInputSelector = useSelector((state: StoreModel) => state.stages.userInput);
+   
+   // pre populated toggle button
+    useEffect(() => {
+        if (
+          stageSelector &&
+          stageSelector[0] &&
+          stageSelector[0].stageInfo &&
+          stageSelector[0].stageInfo.applicants[0]
+        ) {
+    
+          const userInputResponse =userInputSelector.applicants[0][props.data.logical_field_name];
+          const fieldValue = userInputResponse || stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name];
+      if (
+        props.data.logical_field_name === "marketing_email" ||
+        props.data.logical_field_name === "marketing_mobile_message" ||
+        props.data.logical_field_name === "marketing_post" ||
+        props.data.logical_field_name === "marketing_phone_others" ||
+        props.data.logical_field_name === "marketing_phone_all"
+      ) {
+        if (fieldValue==="Y") {
+            console.log(fieldValue);
+            setDefaultCheck(true);
+        }else{
+            setDefaultCheck(false);
+        }
+      }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+      
+    const changeHandler = (
+        fieldName: string,
+        event: React.ChangeEvent<HTMLInputElement>
+      ) => {
+        let checkedValue="";    
+        setDefaultCheck(event.target.checked);
+        if(event.target.checked){
+            checkedValue=CONSTANTS.LOV_DATA.YES;
+        }else{
+            checkedValue=CONSTANTS.LOV_DATA.NO; 
+        }
+       
+        //Start Disable toggle button based on selection other button 
+        if(fieldName==='marketing_phone_others' && event.target.checked===true){
+           const nextfield= document.querySelector<HTMLInputElement>(`input[name=marketing_phone_all]`);
+            if(nextfield!==null){
+                 //eslint-disable-next-line
+                 if(event.target.checked===true){
+                     nextfield.disabled=true
+                    }else{
+                     nextfield.disabled=false
+                 }
+            }
+        }
+        else if(fieldName==='marketing_phone_others' && event.target.checked===false){
+           const nextfield= document.querySelector<HTMLInputElement>(`input[name=marketing_phone_all]`);
+            if(nextfield!==null){
+                 //eslint-disable-next-line
+                 if(event.target.checked===false){
+                     nextfield.disabled=false
+                    }else{
+                     nextfield.disabled=true
+                 }
+            }
+        }
+        
+        else if(fieldName==='marketing_phone_all' && event.target.checked===true){
+           const nextfield= document.querySelector<HTMLInputElement>(`input[name=marketing_phone_others]`);
+            if(nextfield!==null){
+                 //eslint-disable-next-line
+                 if(event.target.checked===true){
+                     nextfield.disabled=true
+                    }else{
+                     nextfield.disabled=false
+                 }
+            }
+        }
+        else if(fieldName==='marketing_phone_all' && event.target.checked===false){
+           const nextfield= document.querySelector<HTMLInputElement>(`input[name=marketing_phone_others]`);
+            if(nextfield!==null){
+                 //eslint-disable-next-line
+                 if(event.target.checked===false){
+                     nextfield.disabled=false
+                    }else{
+                     nextfield.disabled=true
+                 }
+            }
+        }
+        //End Disable toggle button based on selection other button 
+        
+        console.log(checkedValue)
+        props.handleCallback(props.data, checkedValue);
+        dispatch(isFieldUpdate(props, checkedValue, fieldName));
+        props.handleFieldDispatch(fieldName, checkedValue);
+        setError('');
+      }
+
+      const bindHandler = (fieldName: string, event: any) => {
+        if (event.target.validity.valid) {
+          const fieldValue = event.target.value;
+          //dispatch(isFieldUpdate(props, fieldValue, fieldName));
+          //dispatch(isFieldValueUpdate(props, stageSelector, fieldValue));
+        }
+      };
+    return (
+        <>
+           <div className="toggle">
+                <div className="toggle-text">{props.data.rwb_label_name}</div>
+                <div className="toggle-container">
+                    <span className={`switch ${defaultCheck?"checked":""}`}>
+                        <small></small>
+                        <input  
+                           type="checkbox"
+                           name={props.data.logical_field_name}
+                           aria-label={props.data.logical_field_name}
+                           id={fieldIdAppend(props)}
+                           minLength={props.data.min_length}
+                           maxLength={props.data.length}
+                           pattern={props.data.regex ? props.data.regex : ""}
+                        //    defaultChecked={defaultCheck}
+                           checked={defaultCheck}
+                           onChange={changeHandler.bind(this, props.data.logical_field_name)}
+                           onBlur={bindHandler.bind(this, props.data.logical_field_name)}
+                           className={error && 'toggle-error'}
+                        />
+                    </span>
+                </div>
+                {error && (
+                <div className="error-msg">
+                    {error}
+                </div>
+                )}
+           </div>
+        </>
+    )
+
+}
+
+export default Toggel;
+
+
+
