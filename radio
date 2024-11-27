@@ -1,0 +1,569 @@
+import { useEffect, useState } from "react";
+import "./radio-with-label.scss";
+import { useDispatch, useSelector } from "react-redux";
+import renderComponent from "../../../modules/dashboard/fields/renderer";
+import { getFields } from "./radio-with-label.utils";
+import {
+  KeyWithAnyModel,
+  LovInputModel,
+  LovInputValModel,
+  RadioDependecyModel,
+  StoreModel,
+  UserAgeModel
+} from "../../../utils/model/common-model";
+import { fieldError, fieldIdAppend, getUrl, isFieldUpdate } from "../../../utils/common/change.utils";
+import { ValueUpdateAction } from "../../../utils/store/value-update-slice";
+import { checkProductDetails } from "../../../services/common-service"
+import { CONSTANTS } from "../../../utils/common/constants";
+import { stagesAction } from "../../../utils/store/stages-slice";
+import InfoTooltips from "../info-tooltips/info-tooltips";
+import Model from "../model/model";
+import { lovDescAction } from "../../../utils/store/lov-desc-slice";
+import errorMsg from "../../../assets/_json/error.json";
+import { lastAction } from "../../../utils/store/last-accessed-slice";
+
+export const RadioWithLabel = (props: KeyWithAnyModel) => {
+  const [lovData, setLovData] = useState([]);
+  const [selectedLov, setselectedLov] = useState(null);
+  const [isShowOtherOption, setIsShowOtherOption] = useState<boolean>(false);
+  const [disableRadio, setDisableRadio] = useState<boolean>(false);
+  const [radioDependency, setRadioDependency] =
+    useState<RadioDependecyModel | null>();
+  const [field, setField] = useState([]);
+  const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
+  const lovSelector = useSelector((state: StoreModel) => state.lov);
+  const [showPopup, setShowPopup] = useState(false);
+  const language = getUrl.getLanguageInfo("lang");
+  const dynamicFieldSelector = useSelector((state: StoreModel) => state.stages.dynamicFields)
+  const parentChildToggleSelector = useSelector((state: StoreModel) => state.stages.parentChildFields)
+  const userInputSelector = useSelector((state: StoreModel) => state.stages.userInput);
+
+
+  const closePopup = () => {
+    setShowPopup(false);
+  }
+
+  const fieldErrorSelector = useSelector(
+    (state: StoreModel) => state.fielderror.error
+  );
+  const inputSelector = useSelector(
+    (state: StoreModel) => state.stages.userInput
+  );
+  const productSelector = useSelector((state: StoreModel) => state.urlParam.products)
+  const [errors, setErrors] = useState(false);
+  const dispatch = useDispatch();
+  const userAge = useSelector((state: UserAgeModel) => state.userAge);
+  const investmentToggleSelector = useSelector((state: StoreModel) => state.stages.investmentToggle)
+  const radioGroup =
+    [
+      CONSTANTS.LOGICAL_FIELD_NAMES.ID_TYPE_CB,
+      CONSTANTS.LOGICAL_FIELD_NAMES.CASA_FACTA_DECLARATION + "_1",
+      CONSTANTS.LOGICAL_FIELD_NAMES.CASA_FACTA_DECLARATION + "_2",
+      CONSTANTS.LOGICAL_FIELD_NAMES.CASA_FACTA_DECLARATION + "_3",
+      CONSTANTS.LOGICAL_FIELD_NAMES.CASH_NEEDS,
+      CONSTANTS.LOGICAL_FIELD_NAMES.DECISION,
+      CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE,
+      CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE,
+      CONSTANTS.LOGICAL_FIELD_NAMES.ESTATEMENT,
+      CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2,
+      CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3
+    ]
+  useEffect(() => {
+    if (stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.AD_2 && (stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name] === null
+      || stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name] === undefined)) {
+      setErrors(fieldError(fieldErrorSelector, props));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldErrorSelector]);
+
+  useEffect(() => {
+    if (
+      stageSelector &&
+      stageSelector[0] &&
+      stageSelector[0].stageInfo &&
+      stageSelector[0].stageInfo.applicants[0]
+    ) {
+
+      const userInputResponse =
+        inputSelector.applicants[0][props.data.logical_field_name];
+
+      const fieldValue =
+        userInputResponse ||
+        stageSelector[0].stageInfo.applicants[0][
+        props.data.logical_field_name
+        ];
+      if (
+        props.data.logical_field_name === "casa_fatca_declaration_1" ||
+        props.data.logical_field_name === "casa_fatca_declaration_2" ||
+        props.data.logical_field_name === "casa_fatca_declaration_3" ||
+        props.data.logical_field_name === "investment_experience" ||
+        props.data.logical_field_name === "supplementary_invest_experience"
+      ) {
+        if (fieldValue) {
+          setRadioDependency({
+            logical_field_name: props.data.logical_field_name,
+            value: fieldValue,
+          });
+        }
+      } else {
+        setselectedLov(fieldValue);
+      }
+      //Pre-populated estatement field in ad-2 screen
+      if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_2) {
+        setRadioDependency({
+          logical_field_name: props.data.logical_field_name,
+          value: stageSelector[0].stageInfo.applicants[0][
+            props.data.logical_field_name
+          ] ? stageSelector[0].stageInfo.applicants[0][
+          props.data.logical_field_name
+          ] : CONSTANTS.LOV_DATA.YES,
+        });
+        fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.ESTATEMENT, stageSelector[0].stageInfo.applicants[0][
+          props.data.logical_field_name
+        ] ? stageSelector[0].stageInfo.applicants[0][
+        props.data.logical_field_name
+        ] : CONSTANTS.LOV_DATA.YES)
+        dispatch(
+          lovDescAction.addLovData({
+            fieldData: {
+              fieldName: props.data.logical_field_name,
+              code_desc: stageSelector[0].stageInfo.applicants[0][
+                props.data.logical_field_name
+              ] ? stageSelector[0].stageInfo.applicants[0][
+                props.data.logical_field_name
+              ] === 'Y' ? language === CONSTANTS.LANG_EN ? CONSTANTS.YES : language === CONSTANTS.LANG_CN ? CONSTANTS.YES_CN : CONSTANTS.YES_HK : language === CONSTANTS.LANG_EN ? CONSTANTS.NO : language === CONSTANTS.LANG_CN ? CONSTANTS.NO_CN : CONSTANTS.NO_HK : language === CONSTANTS.LANG_EN ? CONSTANTS.YES : language === CONSTANTS.LANG_CN ? CONSTANTS.YES_CN : CONSTANTS.YES_HK,
+              code_value: stageSelector[0].stageInfo.applicants[0][
+                props.data.logical_field_name
+              ] ? stageSelector[0].stageInfo.applicants[0][
+              props.data.logical_field_name
+              ] : CONSTANTS.LOV_DATA.YES
+            }
+          })
+        );
+      }
+
+      //pre-populate element in address screen
+      if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5) {
+        setRadioDependency({
+          logical_field_name: props.data.logical_field_name,
+          value: stageSelector[0].stageInfo.applicants[0][
+            props.data.logical_field_name
+          ] ? stageSelector[0].stageInfo.applicants[0][
+          props.data.logical_field_name
+          ] : CONSTANTS.LOV_DATA.YES,
+        })
+        fieldUpdate(props.data.logical_field_name, stageSelector[0].stageInfo.applicants[0][
+          props.data.logical_field_name
+        ] ? stageSelector[0].stageInfo.applicants[0][
+        props.data.logical_field_name
+        ] : CONSTANTS.LOV_DATA.YES)
+        dispatch(
+          lovDescAction.addLovData({
+            fieldData: {
+              fieldName: props.data.logical_field_name,
+              code_desc: stageSelector[0].stageInfo.applicants[0][
+                props.data.logical_field_name
+              ] ? stageSelector[0].stageInfo.applicants[0][
+                props.data.logical_field_name
+              ] === 'Y' ? language === CONSTANTS.LANG_EN ? CONSTANTS.YES : language === CONSTANTS.LANG_CN ? CONSTANTS.YES_CN : CONSTANTS.YES_HK : language === CONSTANTS.LANG_EN ? CONSTANTS.NO : language === CONSTANTS.LANG_CN ? CONSTANTS.NO_CN : CONSTANTS.NO_HK : language === CONSTANTS.LANG_EN ? CONSTANTS.YES : language === CONSTANTS.LANG_CN ? CONSTANTS.YES_CN : CONSTANTS.YES_HK,
+              code_value: stageSelector[0].stageInfo.applicants[0][
+                props.data.logical_field_name
+              ] ? stageSelector[0].stageInfo.applicants[0][
+              props.data.logical_field_name
+              ] : CONSTANTS.LOV_DATA.YES
+            }
+          })
+        );
+
+      }
+
+
+       //pre-populate element in declaration screen
+       if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_6) {
+        setRadioDependency({
+          logical_field_name: props.data.logical_field_name,
+          value: stageSelector[0].stageInfo.applicants[0][
+            props.data.logical_field_name
+          ] ? stageSelector[0].stageInfo.applicants[0][
+          props.data.logical_field_name
+          ] : CONSTANTS.LOV_DATA.NO,
+        })
+        fieldUpdate(props.data.logical_field_name, stageSelector[0].stageInfo.applicants[0][
+          props.data.logical_field_name
+        ] ? stageSelector[0].stageInfo.applicants[0][
+        props.data.logical_field_name
+        ] : CONSTANTS.LOV_DATA.NO)
+        dispatch(
+          lovDescAction.addLovData({
+            fieldData: {
+              fieldName: props.data.logical_field_name,
+              code_desc: stageSelector[0].stageInfo.applicants[0][
+                props.data.logical_field_name
+              ] ? stageSelector[0].stageInfo.applicants[0][
+                props.data.logical_field_name
+              ] === 'Y' ? language === CONSTANTS.LANG_EN ? CONSTANTS.YES : language === CONSTANTS.LANG_CN ? CONSTANTS.YES_CN : CONSTANTS.YES_HK : language === CONSTANTS.LANG_EN ? CONSTANTS.NO : language === CONSTANTS.LANG_CN ? CONSTANTS.NO_CN : CONSTANTS.NO_HK : language === CONSTANTS.LANG_EN ? CONSTANTS.YES : language === CONSTANTS.LANG_CN ? CONSTANTS.YES_CN : CONSTANTS.YES_HK,
+              code_value: stageSelector[0].stageInfo.applicants[0][
+                props.data.logical_field_name
+              ] ? stageSelector[0].stageInfo.applicants[0][
+              props.data.logical_field_name
+              ] : CONSTANTS.LOV_DATA.NO
+            }
+          })
+        );
+
+      }
+
+
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_3) {
+      if (props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE) {
+
+        if (
+          (dynamicFieldSelector.cash_needs || stageSelector[0].stageInfo.applicants[0].cash_needs) === CONSTANTS.LOV_DATA.YES &&
+          (dynamicFieldSelector.decision || stageSelector[0].stageInfo.applicants[0].decision) === CONSTANTS.LOV_DATA.NO &&
+          userAge.userAge <= CONSTANTS.AGE.AGE_74 &&
+          (dynamicFieldSelector.education_level || stageSelector[0].stageInfo.applicants[0].education_level) &&
+          (dynamicFieldSelector.investment_experience || stageSelector[0].stageInfo.applicants[0].investment_experience) === CONSTANTS.LOV_DATA.YES
+        ) {
+
+          dispatch(stagesAction.updateDynamicFields({ 'label': CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE, 'value': CONSTANTS.LOV_DATA.ONE }))
+          setRadioDependency({ logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE, value: CONSTANTS.LOV_DATA.ONE });
+          setDisableRadio(true)
+          fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE, CONSTANTS.LOV_DATA.ONE)
+        }
+        else {
+          setDisableRadio(false)
+        }
+      }
+      if (props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.DECISION) {
+        if (
+          stageSelector[0].stageInfo.applicants[0].investment_experience
+        ) {
+          setRadioDependency({ logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.DECISION, value: stageSelector[0].stageInfo.applicants[0].decision });
+        }
+
+      }
+      if (props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE) {
+        if (
+          stageSelector[0].stageInfo.applicants[0].investment_experience
+        ) {
+          setRadioDependency({ logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE, value: stageSelector[0].stageInfo.applicants[0].investment_experience });
+          fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE, stageSelector[0].stageInfo.applicants[0].investment_experience)
+        }
+      }
+      if (props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE) {
+        if (
+          stageSelector[0].stageInfo.applicants[0].supplementary_invest_experience
+        ) {
+          setRadioDependency({ logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE, value: stageSelector[0].stageInfo.applicants[0].supplementary_invest_experience });
+          fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE, stageSelector[0].stageInfo.applicants[0].supplementary_invest_experience)
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fieldUpdate = (filedName: string, value: string, option?: string | '' | undefined | null) => {
+    props.handleCallback(props.data, value);
+    props.handleFieldDispatch(filedName, value, option);
+    dispatch(isFieldUpdate(props, value, filedName));
+  }
+
+  const toggleInvestment = () => {
+    dispatch(stagesAction.updateInvestmentToggle());
+  }
+
+  const updateDynamicFields = () => {
+    if ((dynamicFieldSelector.investment_experience || stageSelector[0].stageInfo.applicants[0].investment_experience) !== '' && (dynamicFieldSelector.investment_experience || stageSelector[0].stageInfo.applicants[0].investment_experience) !== undefined) {
+      fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE, (dynamicFieldSelector.investment_experience || stageSelector[0].stageInfo.applicants[0].investment_experience))
+    }
+    if ((dynamicFieldSelector.financial_institution || stageSelector[0].stageInfo.applicants[0].financial_institution) !== '' && (dynamicFieldSelector.financial_institution || stageSelector[0].stageInfo.applicants[0].financial_institution) !== undefined) {
+      fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION, (dynamicFieldSelector.financial_institution || stageSelector[0].stageInfo.applicants[0].financial_institution))
+    }
+    if ((dynamicFieldSelector.financial_product || stageSelector[0].stageInfo.applicants[0].financial_product) !== '' && (dynamicFieldSelector.financial_product || stageSelector[0].stageInfo.applicants[0].financial_product) !== undefined) {
+      fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT, (dynamicFieldSelector.financial_product || stageSelector[0].stageInfo.applicants[0].financial_product))
+    }
+    if ((dynamicFieldSelector.financial_product2 || stageSelector[0].stageInfo.applicants[0].financial_product2) !== '' && (dynamicFieldSelector.financial_product2 || stageSelector[0].stageInfo.applicants[0].financial_product2) !== undefined) {
+      fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2, (dynamicFieldSelector.financial_product2 || stageSelector[0].stageInfo.applicants[0].financial_product2))
+    }
+  }
+
+  useEffect(() => {
+    if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_3) {
+      if (props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE) {
+
+        if (
+          (dynamicFieldSelector.cash_needs || stageSelector[0].stageInfo.applicants[0].cash_needs) === CONSTANTS.LOV_DATA.YES &&
+          (dynamicFieldSelector.decision || stageSelector[0].stageInfo.applicants[0].decision) === CONSTANTS.LOV_DATA.NO &&
+          userAge.userAge <= CONSTANTS.AGE.AGE_74 &&
+          (dynamicFieldSelector.education_level || stageSelector[0].stageInfo.applicants[0].education_level)
+          &&
+          (dynamicFieldSelector.investment_experience || stageSelector[0].stageInfo.applicants[0].investment_experience) === CONSTANTS.LOV_DATA.YES
+        ) {
+
+          if (props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE) {
+            if ((dynamicFieldSelector.investment_experience || stageSelector[0].stageInfo.applicants[0].investment_experience) !== '' && (dynamicFieldSelector.investment_experience || stageSelector[0].stageInfo.applicants[0].investment_experience) !== undefined) {
+              fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE, (dynamicFieldSelector.investment_experience || stageSelector[0].stageInfo.applicants[0].investment_experience))
+            }
+            setRadioDependency({ logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE, value: CONSTANTS.LOV_DATA.ONE });
+            dispatch(stagesAction.updateDynamicFields({ 'label': CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE, 'value': CONSTANTS.LOV_DATA.ONE }))
+            fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE, CONSTANTS.LOV_DATA.ONE)
+            setDisableRadio(true)
+          }
+        } else if (
+          (dynamicFieldSelector.cash_needs || stageSelector[0].stageInfo.applicants[0].cash_needs) === CONSTANTS.LOV_DATA.NO &&
+          (dynamicFieldSelector.decision || stageSelector[0].stageInfo.applicants[0].decision) === CONSTANTS.LOV_DATA.NO &&
+          userAge.userAge < CONSTANTS.AGE.AGE_65 &&
+          (dynamicFieldSelector.education_level || stageSelector[0].stageInfo.applicants[0].education_level)
+          &&
+          (dynamicFieldSelector.investment_experience || stageSelector[0].stageInfo.applicants[0].investment_experience) === CONSTANTS.LOV_DATA.YES
+        ) {
+          if ((dynamicFieldSelector.investment_experience || stageSelector[0].stageInfo.applicants[0].investment_experience) === CONSTANTS.LOV_DATA.YES) {
+            if (props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE) {
+              setDisableRadio(false)
+              updateDynamicFields()
+            }
+          }
+        } else if (
+          (dynamicFieldSelector.cash_needs || stageSelector[0].stageInfo.applicants[0].cash_needs) === CONSTANTS.LOV_DATA.NO &&
+          (dynamicFieldSelector.decision || stageSelector[0].stageInfo.applicants[0].decision) === CONSTANTS.LOV_DATA.NO &&
+          (
+            userAge.userAge > CONSTANTS.AGE.AGE_65 &&
+            userAge.userAge <= CONSTANTS.AGE.AGE_74
+          ) &&
+          (dynamicFieldSelector.education_level || stageSelector[0].stageInfo.applicants[0].education_level)
+          &&
+          (dynamicFieldSelector.investment_experience || stageSelector[0].stageInfo.applicants[0].investment_experience) === CONSTANTS.LOV_DATA.YES
+        ) {
+          if (props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE) {
+            fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE, CONSTANTS.LOV_DATA.ONE)
+            setDisableRadio(false)
+          }
+        }
+      }
+    }
+
+    // if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5) {
+    //   const option = props.data.ui_defaulted_value === 'Y' ? "Yes" : "No";
+    //   fieldUpdate(props.data.logical_field_name, props.data.ui_defaulted_value, option)
+    // }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputSelector.applicants[0].cash_needs, inputSelector.applicants[0].decision, inputSelector.applicants[0].education_level, inputSelector.applicants[0].investment_experience])
+
+  useEffect(() => {
+    if (radioDependency) {
+      const stageComponents = dispatch(
+        getFields(stageSelector, radioDependency, inputSelector, userAge, dynamicFieldSelector, parentChildToggleSelector)
+      );
+      // if (stageComponents && stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.BD_5) {
+      if (stageComponents && stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.AD_1 &&
+        stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.BD_3 &&
+        stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.SSF_1 &&
+        stageComponents && stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.BD_5) {
+        stageComponents.sort((prev: KeyWithAnyModel, next: KeyWithAnyModel) =>
+          prev.seq_no > next.seq_no ? -1 : 0
+        );
+      }
+      // }
+      setField(stageComponents);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [radioDependency, dispatch, investmentToggleSelector]);
+  useEffect(() => {
+    if (props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.ID_TYPE_CB) {
+      const returnValue = checkProductDetails(productSelector);
+      setIsShowOtherOption(returnValue ? true : false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isShowOtherOption])
+
+  useEffect(() => {
+    console.log(radioDependency)
+    console.log(props.data)
+    console.log(userInputSelector.applicants)
+    if (lovSelector.lov.length > 0) {
+      lovSelector.lov.forEach((ref: LovInputModel) => {
+        if (props.data.logical_field_name.includes(ref.label)) {
+          if (ref.value && ref.value !== undefined) {
+            let data = JSON.parse(JSON.stringify(ref.value));
+            console.log('data', data)
+            data.map((res: LovInputValModel): LovInputValModel => {
+              const selectedValue = radioDependency
+                ? radioDependency.value
+                : selectedLov;
+              if (res["CODE_VALUE"] === selectedValue) {
+                res["checked"] = true;
+              } else {
+                res["checked"] = false;
+              }
+              return res;
+            });
+            setLovData(data);
+            setErrors(false);
+          }
+        }
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    lovSelector.lov,
+    props.data.logical_field_name,
+    selectedLov,
+    radioDependency,
+  ]);
+  const parentChildInvestmentRadio = (radioDependency: RadioDependecyModel) => {
+    getFields(stageSelector, radioDependency, inputSelector, userAge, dynamicFieldSelector, parentChildToggleSelector)
+  }
+
+  useEffect(() => {
+    if (field && field.length > 0 && radioDependency) {
+      if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5) {
+        if (radioDependency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2 || radioDependency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3) {
+          parentChildInvestmentRadio(radioDependency)
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [radioDependency, field])
+
+  const userInput = (fieldName: string, event: any, option: string | null) => {
+    if (fieldName === "estatement" && event === 'N') {
+      setShowPopup(true);
+    }
+    // if (inputSelector.applicants[0][fieldName] !== event) {
+      if (radioGroup.includes(fieldName)) {
+        if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_3)
+          dispatch(stagesAction.updateDynamicFields({ 'label': fieldName, 'value': event }))
+        setRadioDependency({ logical_field_name: fieldName, value: event });
+        if (fieldName === CONSTANTS.LOGICAL_FIELD_NAMES.CASH_NEEDS || fieldName === CONSTANTS.LOGICAL_FIELD_NAMES.CASA_FACTA_DECLARATION_1 || fieldName === CONSTANTS.LOGICAL_FIELD_NAMES.CASA_FACTA_DECLARATION_2 || fieldName === CONSTANTS.LOGICAL_FIELD_NAMES.CASA_FACTA_DECLARATION_3) {
+          toggleInvestment()
+        }
+      } else {
+        setselectedLov(event);
+      }
+      fieldUpdate(fieldName, event, option)
+      dispatch(ValueUpdateAction.getChangeUpdate({ id: stageSelector[0].stageId!, changes: true }));
+    // }
+  };
+
+  const handleCallback = (fieldName: string, value: string | number) => {
+    props.handleCallback(fieldName, value);
+  };
+  const handleFieldDispatch = (fieldName: string, value: string | number, option?:any) => {
+    props.handleFieldDispatch(fieldName, value, option);
+  };
+
+  const getMarkup = (desc: string) => {
+    return {
+      __html: `
+          ${desc}
+        `,
+    };
+  }
+
+  const focusHandler = (fieldName: string, event: React.FocusEvent<HTMLInputElement>) => {
+    dispatch(lastAction.getField(fieldName));
+  };
+
+  const changeHandler = (
+    fieldName: string,
+    value: string,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    let optionsValue= [];
+    let newLovData:any=JSON.parse(JSON.stringify(lovData));
+    for(let i in newLovData) {
+      if(newLovData[i].CODE_VALUE === value) {
+        newLovData[i].checked= true;
+        optionsValue.push(newLovData[i]);
+      }
+      else {
+        newLovData[i].checked= false;
+      }
+    }
+    setLovData(newLovData);
+    props.handleCallback(props.data, value);
+    props.handleFieldDispatch(fieldName, value, optionsValue[0].CODE_DESC);
+    setErrors(false);
+    let filteredValue= newLovData.filter((item:any)=>item.checked);
+    if ((props.data.mandatory === "Yes" || props.data.mandatory === "Conditional") && filteredValue.length === 0) {
+      setErrors(true);
+    }
+  }
+
+  const genderField=props.data.logical_field_name==='gender';
+
+  return (
+    <>
+      <div className="radioWithLabel" id={fieldIdAppend(props)}>
+        <span className="infoTipClass">
+          <label className={props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE && disableRadio ? 'radioWithLabelDisabled' : stageSelector[0].stageId === 'ad-1' ? 'labelColor' : ''} htmlFor={props.data.logical_field_name}>
+            {(lovData.filter((item:any)=>item.checked).length> 0 && !errors && !genderField) && <div className="tick-class" style={{backgroundColor: 'transparent', padding: 0}}></div>}
+            <span style={(lovData.filter((item:any)=>item.checked).length> 0 && !errors) ?{marginLeft: "2em"}:{marginLeft:'0'}}>
+          {props.data.rwb_label_name} </span>
+            {/* {props.data.rwb_label_name} */}
+          </label>
+          {props.data.logical_field_name !== "estatement" && <>
+            {props.data.info_tooltips && props.data.info_tooltips !== CONSTANTS.YES && <InfoTooltips infoTooltips={
+              language === CONSTANTS.LANG_EN ? props.data.info_tooltips : props.data.details
+            } />}
+          </>}
+        </span>
+        <div className={(props.data.logical_field_name === "investment_impact" || props.data.logical_field_name === "investment_objective" || props.data.logical_field_name === "client_deposit_info_consent_form" || props.data.logical_field_name === "supplementary_invest_experience") ? "radioAlignColumn" : "radioAlign"}>
+          {lovData &&
+            lovData.map((res: LovInputValModel, index) => {
+              return (
+                // className={stageSelector[0].stageId !== 'bd-3' ? 'radioCss': ''} code for css alignment for radio button
+                <div key={index} className={(props.data.logical_field_name === "investment_impact" || props.data.logical_field_name === "investment_objective" || props.data.logical_field_name === "client_deposit_info_consent_form" || props.data.logical_field_name === "supplementary_invest_experience") ? "" : "radioAligner"}>
+                  <label htmlFor={res.CODE_VALUE} key={index}
+                    {...(
+                      stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_1 || props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE && disableRadio ? {} :
+                        { onClick: () => { userInput(props.data.logical_field_name, res.CODE_VALUE, res.CODE_DESC) } })}
+
+                  >
+                    <input
+                      type="radio"
+                      name={props.data.rwb_label_name}
+                      id={props.data.rwb_label_name + index}
+                      onChange={changeHandler.bind(this, props.data.logical_field_name, res.CODE_VALUE)}
+                      checked={res.checked}
+                      onFocus={focusHandler.bind(this, props.data.logical_field_name)}
+                      disabled={props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE && disableRadio ? disableRadio : props.data.editable}
+                    />
+                    <span dangerouslySetInnerHTML={getMarkup(res.CODE_DESC)}></span>
+                  </label>
+                  <span className="infoTipClass">
+                    {(showPopup) &&
+                      <Model name='info_tooltips' btnTxt={language === CONSTANTS.LANG_EN ? CONSTANTS.OK : language === CONSTANTS.LANG_CN ? CONSTANTS.OK_CN : CONSTANTS.OK_HK} closePopup={closePopup} body_content={<span dangerouslySetInnerHTML={getMarkup(language === CONSTANTS.LANG_EN ? props.data.info_tooltips : props.data.details)}></span>}> </Model>
+                    }
+                  </span>
+                </div>
+              );
+            })}
+        </div>
+      </div >
+      {errors && (
+        <div className="error-msg">
+          {props.data.rwb_label_name} {language === CONSTANTS.LANG_EN ? errorMsg.required_mandatory : language === CONSTANTS.LANG_CN ? errorMsg.required_mandatory_CN : errorMsg.required_mandatory_HK}
+        </div>
+      )}
+      {field && stageSelector[0].stageId !== "bd-5" &&
+        field.map((currentSection: KeyWithAnyModel, index: number) => {
+          return renderComponent(
+            currentSection,
+            index,
+            handleCallback,
+            handleFieldDispatch,
+            props.value
+          );
+        })
+      }
+    </>
+  );
+};
+
+export default RadioWithLabel;
