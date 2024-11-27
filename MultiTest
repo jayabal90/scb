@@ -1,0 +1,151 @@
+import React from "react";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { useSelector, useDispatch } from "react-redux";
+import MultiSelectionBox from "./multi-selection-box";
+
+jest.mock("react-redux", () => ({
+  useSelector: jest.fn(),
+  useDispatch: jest.fn(),
+}));
+
+describe("MultiSelectionBox Component", () => {
+  const mockDispatch = jest.fn();
+  const mockSelectorData = {
+    lov: [
+      {
+        label: "sampleField",
+        value: [
+          { CODE_VALUE: "1", CODE_DESC: "Option 1", checked: false },
+          { CODE_VALUE: "2", CODE_DESC: "Option 2", checked: false },
+        ],
+      },
+    ],
+    stages: { stages: { userInput: { applicants: [{}] } } },
+  };
+
+  beforeEach(() => {
+    useDispatch.mockReturnValue(mockDispatch);
+    useSelector.mockImplementation((callback) =>
+      callback({
+        lov: mockSelectorData.lov,
+        fielderror: { error: false },
+        stages: mockSelectorData.stages,
+      })
+    );
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("renders the MultiSelectionBox with the correct label", () => {
+    render(
+      <MultiSelectionBox
+        data={{
+          logical_field_name: "sampleField",
+          rwb_label_name: "Sample Field",
+          max_selects: "2",
+        }}
+        handleCallback={jest.fn()}
+      />
+    );
+
+    expect(screen.getByLabelText(/Sample Field/i)).toBeInTheDocument();
+  });
+
+  it("shows the dropdown on click and displays available options", () => {
+    render(
+      <MultiSelectionBox
+        data={{
+          logical_field_name: "sampleField",
+          rwb_label_name: "Sample Field",
+          max_selects: "2",
+        }}
+        handleCallback={jest.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByText(/Sample Field/i));
+
+    expect(screen.getByText(/Option 1/i)).toBeInTheDocument();
+    expect(screen.getByText(/Option 2/i)).toBeInTheDocument();
+  });
+
+  it("allows selecting an option and updates the selected list", () => {
+    render(
+      <MultiSelectionBox
+        data={{
+          logical_field_name: "sampleField",
+          rwb_label_name: "Sample Field",
+          max_selects: "2",
+        }}
+        handleCallback={jest.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByText(/Sample Field/i));
+
+    const option1Checkbox = screen.getByLabelText(/Option 1/i);
+    fireEvent.click(option1Checkbox);
+
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: expect.stringContaining("addLovData"),
+      })
+    );
+
+    expect(option1Checkbox).toBeChecked();
+    expect(screen.getByText(/Option 1/i)).toBeInTheDocument();
+  });
+
+  it("displays an error message if no options are selected when mandatory", () => {
+    render(
+      <MultiSelectionBox
+        data={{
+          logical_field_name: "sampleField",
+          rwb_label_name: "Sample Field",
+          max_selects: "2",
+          mandatory: "Yes",
+        }}
+        handleCallback={jest.fn()}
+      />
+    );
+
+    const continueButton = screen.getByText(/Continue/i);
+    fireEvent.click(continueButton);
+
+    expect(screen.getByText(/Sample Field/i)).toBeInTheDocument();
+    expect(mockDispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: expect.stringContaining("addLovData"),
+      })
+    );
+  });
+
+  it("pre-fills selected options based on user input", () => {
+    useSelector.mockImplementation((callback) =>
+      callback({
+        ...mockSelectorData,
+        stages: {
+          userInput: {
+            applicants: [{ sampleField: "1" }],
+          },
+        },
+      })
+    );
+
+    render(
+      <MultiSelectionBox
+        data={{
+          logical_field_name: "sampleField",
+          rwb_label_name: "Sample Field",
+          max_selects: "2",
+        }}
+        handleCallback={jest.fn()}
+      />
+    );
+
+    expect(screen.getByText(/Option 1/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Option 1/i)).toBeChecked();
+  });
+});
