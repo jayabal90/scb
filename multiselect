@@ -1,456 +1,155 @@
-import { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import {
-  KeyWithAnyModel,
-  LovInputModel,
-  LovInputValModel,
-  StoreModel,
-} from "../../../utils/model/common-model";
-import "./multi-selection-box.scss";
-import { fieldError, isFieldUpdate, fieldIdAppend, getUrl } from "../../../utils/common/change.utils";
-import { ValueUpdateAction } from "../../../utils/store/value-update-slice";
-import { lovDescAction } from "../../../utils/store/lov-desc-slice";
+import React from "react";
+import { render, fireEvent, screen } from "@testing-library/react";
+import { useSelector, useDispatch } from "react-redux";
+import MultiSelectionBox from "./MultiSelectionBox";
 import { CONSTANTS } from "../../../utils/common/constants";
 import errorMsg from "../../../assets/_json/error.json";
-import { lastAction } from "../../../utils/store/last-accessed-slice";
 
-const MultiSelectionBox = (props: KeyWithAnyModel) => {
-  const [errors, setErrors] = useState(false);
-  const lovSelector = useSelector((state: StoreModel) => state.lov);
-  const [selectedOption, setSelectedOption] = useState<Array<LovInputValModel>>(
-    []
-  );
-  const fieldErrorSelector = useSelector(
-    (state: StoreModel) => state.fielderror.error
-  );
-  const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
-  const [show, hide] = useState(false);
-  const [update, setUpdate] = useState(false);
-  const [selectedValue, setSelectedValue] = useState<Array<LovInputValModel>>(
-    []
-  );
-  const [search, setSearch] = useState("");
-  const [maxCount, setMaxCount] = useState(false);
-  const [minCount, setMinCount] = useState(true);
-  const [initialValue, setInitialValue] = useState<Array<LovInputValModel>>([]);
-  const dispatch = useDispatch();
-  const max_selects = parseInt(props.data.max_selects);
-  const language = getUrl.getLanguageInfo("lang")
-  const [placeholder, setPlaceHolder] = useState(props.data.rwb_label_name)
-  const userInputSelector = useSelector(
-    (state: StoreModel) => state.stages.userInput
-  );
-  useEffect(() => {
-    const currentFieldLovRes: Array<KeyWithAnyModel> = lovSelector.lov.filter(
-      (res: LovInputModel) => {
-        return res.label === props.data.logical_field_name;
-      }
-    );
-    let preSelectedCode: string | null = null;
-    if (
-      // stageSelector[0].stageInfo.applicants[0][
-      // props.data.logical_field_name
-      // ]
-      userInputSelector.applicants[0][props.data.logical_field_name]
-    ) {
-      // preSelectedCode =
-      //   stageSelector[0].stageInfo.applicants[0][
-      //   props.data.logical_field_name
-      //   ];
-      preSelectedCode = userInputSelector.applicants[0][fieldIdAppend(props)];
-    } else {
-      if (userInputSelector.applicants[0][fieldIdAppend(props)])
-        preSelectedCode =
-          userInputSelector.applicants[0][fieldIdAppend(props)];
-    }
-    if (currentFieldLovRes.length > 0) {
-      let dropDownData = JSON.parse(
-        JSON.stringify(currentFieldLovRes[0].value)
-      );
+jest.mock("react-redux", () => ({
+  useSelector: jest.fn(),
+  useDispatch: jest.fn(),
+}));
 
-      let preSelectedVal =
-        preSelectedCode && preSelectedCode.includes(",")
-          ? preSelectedCode.split(",")
-          : [preSelectedCode];
-      const result = dropDownData.reduce(
-        (prev: Array<LovInputValModel>, acc: LovInputValModel) => {
-          preSelectedVal.forEach((item) => {
-            if (acc.CODE_VALUE === item) {
-              acc.checked = true;
-              prev.push(acc);
-            }
-          });
-          return prev;
-        },
-        []
-      );
+const mockDispatch = jest.fn();
 
-      setSelectedOption(dropDownData);
-      setSelectedValue(result);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stageSelector, lovSelector.lov, props.data.logical_field_name]);
+describe("MultiSelectionBox Component", () => {
+  beforeEach(() => {
+    useDispatch.mockReturnValue(mockDispatch);
+  });
 
-  useEffect(() => {
-    setErrors(fieldError(fieldErrorSelector, props));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fieldErrorSelector]);
-
-  const dropdownHandler = (event: React.MouseEvent<any>) => {
-    event.currentTarget.firstChild.focus();
-    hide(true);
-    setSearch("");
-    const selectedValueInitVal = [...selectedValue];
-    setInitialValue(selectedValueInitVal);
+  const mockState = {
+    lov: [
+      {
+        label: "testField",
+        value: [
+          { CODE_VALUE: "1", CODE_DESC: "Option 1" },
+          { CODE_VALUE: "2", CODE_DESC: "Option 2" },
+        ],
+      },
+    ],
+    fielderror: { error: false },
+    stages: {
+      userInput: {
+        applicants: [{ testField: "1,2" }],
+      },
+      stages: [],
+    },
   };
 
-  const close = () => {
-    setMinCount(true);
-    hide(false);
-    setUpdate((prev: boolean) => !prev);
-    setSearch("");
-    setMaxCount(false);
-
-    setSelectedValue(initialValue);
-    setSelectedOption((prev: Array<LovInputValModel>) => {
-      let lovObj = prev.map((item: LovInputValModel) => {
-        item.checked = false;
-        return item;
-      });
-      initialValue.forEach((response: LovInputValModel) => {
-        const lovIndex = lovObj.findIndex(
-          (item: LovInputValModel) => item.CODE_VALUE === response.CODE_VALUE
-        );
-        if (lovIndex >= 0) {
-          lovObj[lovIndex].checked = true;
-        }
-      });
-      return lovObj;
-    });
+  const mockProps = {
+    data: {
+      logical_field_name: "testField",
+      rwb_label_name: "Test Label",
+      max_selects: "2",
+      mandatory: "Yes",
+    },
+    handleCallback: jest.fn(),
   };
 
-  const continueBtn = () => {
-    if (!(maxCount || minCount)) {
-      const prevValue =
-        stageSelector[0].stageInfo.applicants[0][fieldIdAppend(props)];
-      if (prevValue) {
-        const prevArrObj = prevValue.includes(",")
-          ? prevValue.split(",")
-          : [prevValue];
-        const selectedObj = selectedValue.reduce((prev: any, acc: any) => {
-          prev.push(acc.CODE_VALUE);
-          return prev.sort();
-        }, []);
-        if (prevArrObj.sort().toString() !== selectedObj.toString()) {
-          dispatch(
-            ValueUpdateAction.getChangeUpdate({
-              id: stageSelector[0].stageId!,
-              changes: true,
-            })
-          );
-        }
-      } else {
-        dispatch(
-          ValueUpdateAction.getChangeUpdate({
-            id: stageSelector[0].stageId!,
-            changes: true,
-          })
-        );
-      }
-
-      if (selectedValue.length > max_selects) {
-        setMaxCount(true);
-        setMinCount(false);
-      } else if (!(selectedValue.length > 0)) {
-        hide(true);
-      } else {
-        setUpdate((prev: boolean) => !prev);
-        setMaxCount(false);
-        hide(false);
-      }
-    }
-  };
-
-  const addUserInput = (data: LovInputValModel, event: any, logical_field_name: string) => {
-    const previousSelectedOption = [...selectedOption];
-    const updatedSelectedOption = previousSelectedOption.map(
-      (item: LovInputValModel) => {
-        if (item.CODE_DESC === data["CODE_DESC"]) {
-          item["checked"] = !item["checked"];
-        }
-        return item;
-      }
-    );
-    setSelectedOption(updatedSelectedOption);
-
-    setSelectedValue((prevUser: Array<LovInputValModel>) => {
-      const isExits = prevUser.find(
-        (item: LovInputValModel) => item.CODE_VALUE === data["CODE_VALUE"]
-      );
-      if (!isExits && event.target.checked) {
-        prevUser.push(data);
-      } else {
-        if (!event.target.checked) {
-          const fieldIndex = prevUser.findIndex(
-            (item: LovInputValModel) => item.CODE_VALUE === data["CODE_VALUE"]
-          );
-          prevUser.splice(fieldIndex, 1);
-        }
-      }
-      if (!(prevUser.length > max_selects)) {
-        if (!(prevUser.length > 0)) {
-          setMinCount(true);
-        } else {
-          setMaxCount(false);
-          setMinCount(false);
-        }
-      }
-      return prevUser;
-    });
-    if (event.target.checked)
-      dispatch(
-        lovDescAction.addLovData({
-          fieldData: {
-            fieldName: logical_field_name,
-            code_desc: data["CODE_DESC"],
-            code_value: data["CODE_VALUE"]
-          }
-        })
-      );
-  };
-
-  const removeSelectedValues = (
-    event: React.MouseEvent<HTMLDivElement, MouseEvent>,
-    data: LovInputValModel
-  ) => {
-    event.stopPropagation();
-    event.isPropagationStopped();
-
-    const previousSelectedValue = [...selectedValue];
-
-    let fieldIndex = previousSelectedValue.findIndex(
-      (item: LovInputValModel) => item.CODE_VALUE === data["CODE_VALUE"]
-    );
-    if (fieldIndex !== -1) {
-      previousSelectedValue.splice(fieldIndex, 1);
-    }
-    setSelectedValue(previousSelectedValue);
-
-    const previousSelectedOption = [...selectedOption];
-    const result = previousSelectedOption.map((item: LovInputValModel) => {
-      if (item.CODE_VALUE === data["CODE_VALUE"]) {
-        item["checked"] = !item["checked"];
-      }
-      return item;
-    });
-    setSelectedOption(result);
-    dispatch(
-      ValueUpdateAction.getChangeUpdate({
-        id: stageSelector[0].stageId!,
-        changes: true,
+  const setUp = (stateOverrides = {}) => {
+    useSelector.mockImplementation((selectorFn) =>
+      selectorFn({
+        ...mockState,
+        ...stateOverrides,
       })
     );
-    dispatch(isFieldUpdate(props, '', props.data.logical_field_name));
-    if ((props.data.mandatory === "Yes" || props.data.mandatory === "Conditional") && data.checked === false) {
-      setErrors(true);
-    }
+    render(<MultiSelectionBox {...mockProps} />);
   };
 
-  useEffect(() => {
-    // setErrors(false);
-    if ((selectedValue.length > 0)) {
-      setMinCount(false);
-      setErrors(false);
-    }
-    const val =
-      selectedValue &&
-      selectedValue.reduce((prev: Array<string>, acc: LovInputValModel) => {
-        prev.push(acc.CODE_VALUE);
-        return prev;
-      }, []);
-    if (val.toString()) {
-      if (props.data.mandatory === "Yes") {
-        props.handleCallback(props.data, val.toString());
-      }
-      dispatch(
-        isFieldUpdate(
-          props,
-          val.toString(),
-          props.data.logical_field_name
-        )
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedValue, update]);
+  it("renders component correctly with initial values", () => {
+    setUp();
+    expect(screen.getByLabelText("Test Label")).toBeInTheDocument();
+    expect(screen.getByText("Option 1")).toBeInTheDocument();
+    expect(screen.getByText("Option 2")).toBeInTheDocument();
+  });
 
-  const searchFilter = (item: LovInputValModel) => {
-    if (search !== "") {
-      return item.CODE_DESC.toLowerCase().includes(search.toLowerCase());
-    } else {
-      return item.CODE_DESC;
-    }
-  };
+  it("shows options when dropdown is clicked", () => {
+    setUp();
+    const dropdownField = screen.getByLabelText("Test Label");
+    fireEvent.click(dropdownField);
 
-  const noResults = (selectedOption && selectedOption.filter(searchFilter).length > 0);
-  const filtered = selectedOption &&  selectedOption.filter(searchFilter);
-  const finalOptions = search === "" ? selectedOption : filtered;
+    expect(screen.getByText("Option 1")).toBeVisible();
+    expect(screen.getByText("Option 2")).toBeVisible();
+  });
 
-  useEffect(() => {
-    var lovData:any= lovSelector.lov.filter((item:any)=>item.label === props.data.logical_field_name);
-    let filteredLovData:any= lovData.length > 0 ? JSON.parse(JSON.stringify(lovData[0].value)) : [];
-    let filteredData= filteredLovData.filter((item:any)=>{
-      if(userInputSelector && userInputSelector.applicants[0] && userInputSelector.applicants[0][props.data.logical_field_name]) {
-        let definedValues= userInputSelector.applicants[0][props.data.logical_field_name].split(',');
-        for(let i in definedValues) {
-          if(item.CODE_VALUE === definedValues[i]) {
-            return item
-          }
-        }
-      }
-      else if(item.CODE_VALUE === props.data.ui_defaulted_value) {
-        return item
-      }
-    })
-    let updatedSelectedOption = filteredData.map((item:any) => ({
-      ...item,
-      checked: true       
-    }));
-    let selectedOptions = lovData.length > 0 ? JSON.parse(JSON.stringify(lovData[0].value)) : [];
+  it("updates selected values when an option is checked", () => {
+    setUp();
+    const dropdownField = screen.getByLabelText("Test Label");
+    fireEvent.click(dropdownField);
 
-    for(let i in selectedOptions) {
-      if(userInputSelector && userInputSelector.applicants[0] && userInputSelector.applicants[0][props.data.logical_field_name]){
-        let definedValues= userInputSelector.applicants[0][props.data.logical_field_name].split(',');
-        for(let n in definedValues) {
-          if(selectedOptions[i].CODE_VALUE === definedValues[n]) {
-            selectedOptions[i].checked= true;
-          }
-        }
-      }
-      else if(selectedOptions[i].CODE_VALUE === props.data.ui_defaulted_value){
-        selectedOptions[i].checked= true;
-      }
-    }
-    if(props.data.ui_defaulted_value || userInputSelector && userInputSelector.applicants[0] && userInputSelector.applicants[0][props.data.logical_field_name]) {
-      setSelectedValue(updatedSelectedOption);
-      setSelectedOption(selectedOptions);
-      dispatch(
-        lovDescAction.addLovData({
+    const option1Checkbox = screen.getByLabelText("Option 1");
+    fireEvent.click(option1Checkbox);
+
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: expect.stringContaining("addLovData"),
+        payload: expect.objectContaining({
           fieldData: {
-            fieldName: props.data.logical_field_name,
-            code_desc: updatedSelectedOption.length>0 && updatedSelectedOption[0]["CODE_DESC"] ?  updatedSelectedOption[0]["CODE_DESC"] : '',
-            code_value: updatedSelectedOption.length>0 && updatedSelectedOption[0]["CODE_VALUE"] ? updatedSelectedOption[0]["CODE_VALUE"] : ''
-          }
-        })
-      );
-    }
-    if (props.data.logical_field_name === 'nationality') {
-      setPlaceHolder('')
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps  
-  }, [])
+            fieldName: "testField",
+            code_desc: "Option 1",
+            code_value: "1",
+          },
+        }),
+      })
+    );
+  });
 
-  const focusHandler = (fieldName: string, event: React.FocusEvent<HTMLInputElement>) => {
-    dispatch(lastAction.getField(fieldName))
-  }
+  it("handles removal of selected values", () => {
+    setUp();
+    const removeButton = screen.getByText("Option 1").closest(".multi-close");
+    fireEvent.click(removeButton);
 
-  return (
-    <>
-      <div className="multi-select">
-        <label htmlFor={props.data.logical_field_name}>
-          {props.data.rwb_label_name}
-        </label>
-        <div
-          className={`multi-select__field`}
-          onClick={(e) => dropdownHandler(e)}
-          onFocus={focusHandler.bind(this, props.data.logical_field_name)}
-        >
-          {selectedValue &&
-            selectedValue.length > 0 &&
-            selectedValue.map((item: LovInputValModel) => {
-              return (
-                <span
-                  className="multi-select__fieldlabel"
-                  key={item.CODE_VALUE}
-                >
-                  <span>{item.CODE_DESC}</span>
-                  <span
-                    className="multi-close"
-                    onClick={(
-                      event: React.MouseEvent<HTMLDivElement, MouseEvent>
-                    ) => removeSelectedValues(event, item)}
-                  ></span>
-                </span>
-              );
-            })}
-          {!(selectedValue && selectedValue.length > 0) && (
-            <input
-              type="text"
-              className="dropdown-select__input"
-              id={fieldIdAppend(props)}
-              placeholder={placeholder}
-            />
-          )}
-        </div>
-        {show && selectedOption && (
-          <div className="multi-select__background">
-            <div className="multi-select__popup">
-              <div className="multi-select__header">
-                <div>{props.data.rwb_label_name}</div>
-                <div className="close" onClick={close}></div>
-              </div>
-              <div className="multi-select__search">
-                <label htmlFor="search"></label>
-                <input
-                  name="search"
-                  type="search"
-                  placeholder={language === CONSTANTS.LANG_EN ? "Search" : language === CONSTANTS.LANG_CN ? "搜寻" : "搜尋"}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-              </div>
-              {maxCount && <div className="max-count">{language === CONSTANTS.LANG_EN ? "You have selected maximum options for " + props.data.rwb_label_name : language === CONSTANTS.LANG_CN ? "您已选择最多选项" + props.data.rwb_label_name : "您已選擇最多選項" + props.data.rwb_label_name} </div>}
-              <div className="multi-select__expand">
-                {noResults ? 
-                // (selectedOption
-                //   .filter(searchFilter).length > 0) ?
-                //   selectedOption
-                //     .filter(searchFilter)
-                finalOptions.map((item: LovInputValModel, index: number) => {
-                      return (
-                        <div key={index} className="multi-select__item">
-                          <input
-                            type="checkbox"
-                            checked={item.checked}
-                            onChange={(event) => addUserInput(item, event, props.data.logical_field_name)}
-                            value={item.CODE_VALUE}
-                            id={item.CODE_VALUE}
-                            disabled={selectedValue.length >= max_selects ? item.checked ? false : true : false}
-                          />
-                          <label htmlFor={item.CODE_VALUE}>
-                            {item.CODE_DESC}
-                          </label>
-                        </div>
-                      );
-                    }) : <div className="multi-select__noResult"> {language === CONSTANTS.LANG_EN ? "No Results" : language === CONSTANTS.LANG_CN ? "没有结果" : "沒有結果"} </div>}
-              </div>
-              <div className="multi-select__btn">
-                <span
-                  className={`${maxCount || minCount ? "multi-select__btn--disabled" : ""}`}
-                  onClick={continueBtn}
-                >
-                  {language === CONSTANTS.LANG_EN ? "Continue" : language === CONSTANTS.LANG_CN ? "继续" : "繼續"}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-      {errors && (
-        <div className="error-msg">
-          {language === CONSTANTS.LANG_EN ? errorMsg.multiSelectError : language === CONSTANTS.LANG_CN ? errorMsg.emity_CN : errorMsg.emity_HK}{props.data.rwb_label_name}
-        </div>
-      )}
-    </>
-  );
-};
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: expect.stringContaining("getChangeUpdate"),
+        payload: expect.objectContaining({ changes: true }),
+      })
+    );
+  });
 
-export default MultiSelectionBox;
+  it("disables further selection after max_selects is reached", () => {
+    setUp();
+    const dropdownField = screen.getByLabelText("Test Label");
+    fireEvent.click(dropdownField);
+
+    const option1Checkbox = screen.getByLabelText("Option 1");
+    const option2Checkbox = screen.getByLabelText("Option 2");
+    fireEvent.click(option1Checkbox);
+    fireEvent.click(option2Checkbox);
+
+    const newOptionCheckbox = screen.getByLabelText("Option 2");
+    expect(newOptionCheckbox).toBeDisabled();
+  });
+
+  it("displays an error message when no values are selected and mandatory", () => {
+    setUp({ fielderror: { error: true } });
+
+    expect(screen.getByText(errorMsg.multiSelectError + "Test Label")).toBeInTheDocument();
+  });
+
+  it("filters options based on search input", () => {
+    setUp();
+    const dropdownField = screen.getByLabelText("Test Label");
+    fireEvent.click(dropdownField);
+
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    fireEvent.change(searchInput, { target: { value: "Option 1" } });
+
+    expect(screen.getByText("Option 1")).toBeVisible();
+    expect(screen.queryByText("Option 2")).not.toBeInTheDocument();
+  });
+
+  it("calls handleCallback when values change", () => {
+    setUp();
+    const dropdownField = screen.getByLabelText("Test Label");
+    fireEvent.click(dropdownField);
+
+    const option1Checkbox = screen.getByLabelText("Option 1");
+    fireEvent.click(option1Checkbox);
+
+    expect(mockProps.handleCallback).toHaveBeenCalledWith(
+      expect.objectContaining({ logical_field_name: "testField" }),
+      expect.stringContaining("1")
+    );
+  });
+});
