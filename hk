@@ -1,0 +1,312 @@
+import React, { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { KeyWithAnyModel, StoreModel } from "../../../utils/model/common-model";
+import { fieldError, getUrl, isFieldUpdate } from "../../../utils/common/change.utils";
+import '../hkid/hkid.scss';
+import errorMsg from "../../../assets/_json/error.json";
+import { CONSTANTS } from "../../../utils/common/constants";
+import { ContinueBtnAction } from "../../../utils/store/continue-validation-slice";
+import { lastAction } from "../../../utils/store/last-accessed-slice";
+import { fieldErrorAction } from "../../../utils/store/field-error-slice";
+
+export const HKID = (props: KeyWithAnyModel) => {
+console.log(props);
+  interface HKIDState{
+  hk1:string;
+  hk2: string;
+  hk3: string;
+}
+
+interface ErrorState{
+  hk1:boolean;
+  hk2:boolean;
+  hk3:boolean;
+}
+interface TouchedState{
+  hk1:boolean;
+  hk2:boolean;
+  hk3:boolean;
+}
+  const [error, setError] = useState('');
+  const fieldErrorSelector = useSelector(
+    (state: StoreModel) => state.fielderror.error
+  );
+  const dispatch = useDispatch();
+  let propsData = props && props.data;
+  const [hkid, setHkid] = useState({hk1: "", hk2: "", hk3: ""});
+  const [hkid1, setHkid1] = useState("");
+  const [hkid2, setHkid2] = useState("");
+  const [hkid3, setHkid3] = useState("");
+  const [tickMark, setTickMark] = useState(false);
+  const language = getUrl.getLanguageInfo("lang")
+  const box1Regex = /[A-Z]/g;
+  const box2Regex = /^[0-9]{6}$/; // /^[0-9]*$/;
+  const box3Regex = /[0-9A]/g;
+
+
+  // const [hkidstate, setHkidState] = useState<HKIDState>({hkid1:"", hkid2:"", hkid3:""});
+  const [errors, setErrors] = useState<ErrorState>({
+    hk1:false,
+    hk2:false,
+    hk3:false
+
+  });
+  const [touched, setTouched]= useState<TouchedState>({
+    hk1:false,
+    hk2:false,
+    hk3:false
+  })
+
+  useEffect(() => {
+    if (fieldError(fieldErrorSelector, props)) {
+
+      dispatch(
+        fieldErrorAction.getFieldError({
+          fieldName: props.data.logical_field_name,
+        }));
+
+      setError(`${language === CONSTANTS.LANG_EN ? errorMsg.patterns : language === CONSTANTS.LANG_CN ? errorMsg.patterns_CN : errorMsg.patterns_HK}${props.data.rwb_label_name}`)
+    } else {
+      setError('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldErrorSelector]);
+
+  useEffect(()=>{
+    if(error === ""){
+        dispatch(ContinueBtnAction.getContinueEnableState(true));
+      } else{
+        dispatch(ContinueBtnAction.getContinueEnableState(false));
+      }
+       // eslint-disable-next-line react-hooks/exhaustive-deps  
+  },[error, dispatch])
+
+  
+  const focusHandler = (fieldName: string, event: React.FocusEvent<HTMLInputElement>) => {
+    dispatch(lastAction.getField(fieldName))
+  }
+  
+
+  const changeHandlerNew = (
+    data: React.ChangeEvent<HTMLInputElement>,
+    type: string
+  ) => {
+    let hasError=false;
+    let newError: ErrorState ={
+      hk1:false,
+      hk2:false,
+      hk3:false
+    }
+    // setHkid2(data.target.value);
+    
+    const fieldName = props.data.logical_field_name;
+    const val =data.target.value;
+    //on focus
+    if(val.length===data.target.maxLength ){
+        const nextfield =document.querySelector<HTMLInputElement>(`input[name=${props.data.logical_field_name}${'_3'}]`)
+        if(nextfield!==null){
+          nextfield.focus();
+        }
+    }
+    if (type === 'hk1') {
+      const reg1= box1Regex.test(val)
+       if(!reg1){
+        newError.hk1=true;
+        hasError=true;
+       }      
+        hkid["hk1"] = val.toUpperCase();
+        
+      
+  
+    } else if (type === 'hk2') {
+      const reg2= box2Regex.test(val)
+      if(!reg2){
+        newError.hk2=true;
+        hasError=true
+       }
+      hkid["hk2"] = data.target.value;
+      setHkid2(val);
+    } else if (type === 'hk3') {
+      const reg3= box3Regex.test(val)
+      console.log("reg3:", reg3);
+      if(!reg3){
+        newError.hk3=true;
+        hasError=true
+       }
+     
+      hkid["hk3"] = data.target.value;
+      setHkid3(val);
+    }
+    setErrors(newError);
+    const userValue = hkid["hk1"] + hkid["hk2"]+ hkid["hk3"];
+    if(!HKIDVerification(userValue)){
+        setTickMark(false);
+        dispatch(
+          fieldErrorAction.getFieldError({
+            fieldName: props.data.logical_field_name,
+          }));
+        }
+      else{
+        setTickMark(true)
+        setError('');
+        dispatch(
+          fieldErrorAction.removeToggleFieldError(
+           props.data.logical_field_name,
+          ));
+  
+          }
+    
+    setHkid({hk1: hkid["hk1"], hk2: hkid["hk2"], hk3: hkid["hk3"]})
+    props.handleCallback(props.data, userValue);
+    dispatch(isFieldUpdate(props, userValue, fieldName));
+    // setHkid({ DD: splitDate[2], MM: splitDate[1], YYYY: splitDate[0] });
+    return !hasError;
+  }
+
+  const HKIDVerification = (str: String) => {
+     // regular expression to check pattern and split
+     var hkidPat = /^([A-Z]{1,2})([0-9]{6})([A0-9])$/;
+     var matchArray = str.match(hkidPat);
+     if (matchArray) {
+       return checkhkidValidation(matchArray);
+     } else {
+       setError('HKID number is invalid');
+       dispatch(
+        fieldErrorAction.getFieldError({
+          fieldName: props.data.logical_field_name,
+        }));
+       return false;
+     }
+  }
+  const checkhkidValidation=(matchArray: RegExpMatchArray) =>{
+    let formula: any
+    let status :any 
+    let message:any
+    let charPart :any = matchArray[1];
+    let numPart = matchArray[2];
+    let checkDigit = matchArray[3];
+   
+    // calculate the checksum for character part
+    var checkSum = 0;
+    if (charPart.length == 2) {
+      checkSum += 9 * (10 + charPart.charAt(0).charCodeAt(0) - 65);
+      checkSum += 8 * (10 + charPart.charAt(1).charCodeAt(0) - 65);
+     formula += `${charPart.charAt(0).charCodeAt(0) - 64 +"*9"} ${charPart.charAt(1).charCodeAt(0) - 64 + "*8"}`;
+    } else {
+      checkSum += 9 * 36;
+      //$log.log("char: "+charPart+", ASCII: "+charPart.charCodeAt(0))
+      checkSum += 8 * (10 + charPart.charCodeAt(0) - 65);
+      formula += charPart.charAt(0).charCodeAt(0) - 64 + "*8 + ";
+    }
+
+    // calculate the checksum for numeric part
+    for (var i = 0, j = 7; i < numPart.length; i++, j--) {
+      checkSum += j * parseInt(numPart.charAt(i));
+      if (i == numPart.length - 1)
+        formula += numPart.charAt(i) + "*" + j;
+      else
+        formula += numPart.charAt(i) + "*" + j + " + ";
+    }
+
+    // verify the check digit
+    var remaining = checkSum % 11;
+    var verify = remaining == 0 ? 0 : 11 - remaining;
+
+    formula += "\n = " + checkSum + " % 11 = " + remaining;
+    if (remaining == 0)
+      formula += "\n Check Digit should = 0";
+    else
+      formula += "\n Check Digit should = 11 - " + remaining + " = " + verify;
+
+    if (verify == parseInt(checkDigit) || (verify == 10 && checkDigit == 'A')) {
+      //return "Pass"
+      status = true;
+    } else {
+      message = "Invalid, fail in algorithm validation"
+    }
+    if (status) {
+      // return false;
+      setError('')
+      dispatch(
+        fieldErrorAction.removeToggleFieldError(
+          props.data.logical_field_name,
+        ));
+      return true
+    } else {
+      //clearHKID();
+      setError('HKID number is invalid')
+      dispatch(
+        fieldErrorAction.getFieldError({
+          fieldName: props.data.logical_field_name,
+        }));
+      //return true;
+      return false
+    }
+  }
+
+  return (
+    <>{propsData &&
+      <div className="hkid">
+        <label htmlFor={props.data.logical_field_name}>
+        { (!error && tickMark) && <div className="tick-class"></div>}
+         <span style={  (!error && tickMark) ?{marginLeft: "2em"}:{marginLeft:'0'}}> {props.data.rwb_label_name}</span>
+        </label>
+        <div>
+          <input
+            type="text"
+            data-testId="main"
+            name={props.data.logical_field_name + '_1'}
+            id={props.data.logical_field_name + '_1'}
+            value={hkid.hk1}
+            minLength={1}
+            maxLength={2}
+            onChange={(event) => changeHandlerNew(event, "hk1")}
+            onFocus={focusHandler.bind(this, props.data.logical_field_name)}
+            disabled={props.data.editable}
+            className={`${errors.hk1 ? 'input-error' : 'input-error1'}`}
+            autoComplete="off"
+          />
+          <span className="hkid-separators-m">-</span>
+          <input
+            minLength={6}
+            maxLength={6}
+            role="hk2"
+            type="tel"
+            value={hkid.hk2}
+            onChange={(event) => changeHandlerNew(event, "hk2")}
+            onFocus={focusHandler.bind(this, props.data.logical_field_name + '_2')}
+            disabled={props.data.editable}
+            className={errors.hk2 ? 'input-error':'input-error1'}
+            name={props.data.logical_field_name + '_2'}
+            id={props.data.logical_field_name + '_2'}
+            autoComplete="off"
+          />
+          <span className="hkid-separators-m">-</span>
+          <span className="hkid-separators-m">(</span>
+          <input
+            minLength={1}
+            maxLength={1}
+            type="tel"
+            role="hk3"
+            value={hkid.hk3}
+            onChange={(event) => changeHandlerNew(event, "hk3")}
+            onFocus={focusHandler.bind(this, props.data.logical_field_name + '_3')}
+            disabled={props.data.editable}
+            className={errors.hk3 ? 'input-error':'input-error1'}
+            name={props.data.logical_field_name + '_3'}
+            id={props.data.logical_field_name + '_3'}
+            autoComplete="off"
+          />
+          <span className="hkid-separators-m">)</span>
+        </div>
+      </div>}
+      {error && (
+        <div className="error-msg">
+          {error}
+        </div>
+      )}
+    </>
+  );
+};
+
+export default HKID;
