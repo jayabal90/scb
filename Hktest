@@ -1,0 +1,131 @@
+import React from "react";
+import { render, fireEvent, screen } from "@testing-library/react";
+import { useSelector, useDispatch } from "react-redux";
+import HKID from "../path/to/HKID";
+
+jest.mock("react-redux", () => ({
+  useSelector: jest.fn(),
+  useDispatch: jest.fn(),
+}));
+
+describe("HKID Component", () => {
+  const mockDispatch = jest.fn();
+
+  const mockProps = {
+    data: {
+      logical_field_name: "hkidField",
+      rwb_label_name: "Enter HKID",
+      editable: false,
+    },
+    handleCallback: jest.fn(),
+  };
+
+  beforeEach(() => {
+    useDispatch.mockReturnValue(mockDispatch);
+    useSelector.mockImplementation((callback) =>
+      callback({
+        fielderror: { error: null },
+      })
+    );
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("renders the HKID component correctly", () => {
+    render(<HKID {...mockProps} />);
+
+    // Check if the label and input fields are rendered
+    expect(screen.getByText("Enter HKID")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /hkidField_1/i })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /hkidField_2/i })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /hkidField_3/i })).toBeInTheDocument();
+  });
+
+  it("validates and updates hk1 field correctly", () => {
+    render(<HKID {...mockProps} />);
+
+    const hk1Input = screen.getByRole("textbox", { name: /hkidField_1/i });
+
+    // Simulate valid input
+    fireEvent.change(hk1Input, { target: { value: "A" } });
+    expect(hk1Input.value).toBe("A");
+
+    // Simulate invalid input
+    fireEvent.change(hk1Input, { target: { value: "1" } });
+    expect(screen.getByText("HKID number is invalid")).toBeInTheDocument();
+    expect(mockDispatch).toHaveBeenCalledWith({
+      type: "fieldErrorAction/getFieldError",
+      payload: { fieldName: "hkidField" },
+    });
+  });
+
+  it("validates and updates hk2 field correctly", () => {
+    render(<HKID {...mockProps} />);
+
+    const hk2Input = screen.getByRole("textbox", { name: /hkidField_2/i });
+
+    // Simulate valid input
+    fireEvent.change(hk2Input, { target: { value: "123456" } });
+    expect(hk2Input.value).toBe("123456");
+
+    // Simulate invalid input
+    fireEvent.change(hk2Input, { target: { value: "123" } });
+    expect(screen.getByText("HKID number is invalid")).toBeInTheDocument();
+    expect(mockDispatch).toHaveBeenCalledWith({
+      type: "fieldErrorAction/getFieldError",
+      payload: { fieldName: "hkidField" },
+    });
+  });
+
+  it("validates and updates hk3 field correctly", () => {
+    render(<HKID {...mockProps} />);
+
+    const hk3Input = screen.getByRole("textbox", { name: /hkidField_3/i });
+
+    // Simulate valid input
+    fireEvent.change(hk3Input, { target: { value: "A" } });
+    expect(hk3Input.value).toBe("A");
+
+    // Simulate invalid input
+    fireEvent.change(hk3Input, { target: { value: "@" } });
+    expect(screen.getByText("HKID number is invalid")).toBeInTheDocument();
+    expect(mockDispatch).toHaveBeenCalledWith({
+      type: "fieldErrorAction/getFieldError",
+      payload: { fieldName: "hkidField" },
+    });
+  });
+
+  it("handles focus event correctly", () => {
+    render(<HKID {...mockProps} />);
+
+    const hk1Input = screen.getByRole("textbox", { name: /hkidField_1/i });
+
+    // Simulate focus event
+    fireEvent.focus(hk1Input);
+    expect(mockDispatch).toHaveBeenCalledWith({
+      type: "lastAction/getField",
+      payload: "hkidField",
+    });
+  });
+
+  it("triggers handleCallback on valid HKID", () => {
+    render(<HKID {...mockProps} />);
+
+    const hk1Input = screen.getByRole("textbox", { name: /hkidField_1/i });
+    const hk2Input = screen.getByRole("textbox", { name: /hkidField_2/i });
+    const hk3Input = screen.getByRole("textbox", { name: /hkidField_3/i });
+
+    // Input valid values
+    fireEvent.change(hk1Input, { target: { value: "A" } });
+    fireEvent.change(hk2Input, { target: { value: "123456" } });
+    fireEvent.change(hk3Input, { target: { value: "7" } });
+
+    // Check if handleCallback is called with the correct HKID
+    expect(mockProps.handleCallback).toHaveBeenCalledWith(
+      mockProps.data,
+      "A1234567"
+    );
+  });
+});
