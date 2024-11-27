@@ -1,0 +1,163 @@
+import React from "react";
+import { render, fireEvent, screen } from "@testing-library/react";
+import { useSelector, useDispatch } from "react-redux";
+import HKID from "../path/to/HKID";
+
+jest.mock("react-redux", () => ({
+  useSelector: jest.fn(),
+  useDispatch: jest.fn(),
+}));
+
+describe("HKID Component", () => {
+  const mockDispatch = jest.fn();
+  const mockUseSelector = (state) => {
+    useSelector.mockImplementation((selector) => selector(state));
+  };
+
+  const mockProps = {
+    data: {
+      logical_field_name: "hkid_field",
+      rwb_label_name: "HKID",
+      editable: false,
+    },
+    handleCallback: jest.fn(),
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useDispatch.mockReturnValue(mockDispatch);
+  });
+
+  it("renders correctly with initial state", () => {
+    mockUseSelector({
+      fielderror: {
+        error: null,
+      },
+    });
+
+    render(<HKID {...mockProps} />);
+
+    // Check the label
+    expect(screen.getByText("HKID")).toBeInTheDocument();
+
+    // Check the input fields
+    const hk1Input = screen.getByRole("textbox", { name: "hkid_field_1" });
+    const hk2Input = screen.getByRole("textbox", { name: "hkid_field_2" });
+    const hk3Input = screen.getByRole("textbox", { name: "hkid_field_3" });
+
+    expect(hk1Input).toBeInTheDocument();
+    expect(hk2Input).toBeInTheDocument();
+    expect(hk3Input).toBeInTheDocument();
+  });
+
+  it("validates and updates hk1 field correctly", () => {
+    mockUseSelector({
+      fielderror: {
+        error: null,
+      },
+    });
+
+    render(<HKID {...mockProps} />);
+
+    const hk1Input = screen.getByRole("textbox", { name: "hkid_field_1" });
+
+    // Simulate valid input
+    fireEvent.change(hk1Input, { target: { value: "A" } });
+    expect(hk1Input.value).toBe("A");
+
+    // Simulate invalid input
+    fireEvent.change(hk1Input, { target: { value: "1" } }); // Invalid
+    expect(screen.getByText("HKID number is invalid")).toBeInTheDocument();
+    expect(mockDispatch).toHaveBeenCalledWith({
+      type: "field-error-slice/getFieldError",
+      payload: { fieldName: "hkid_field" },
+    });
+  });
+
+  it("validates and updates hk2 field correctly", () => {
+    mockUseSelector({
+      fielderror: {
+        error: null,
+      },
+    });
+
+    render(<HKID {...mockProps} />);
+
+    const hk2Input = screen.getByRole("textbox", { name: "hkid_field_2" });
+
+    // Simulate valid input
+    fireEvent.change(hk2Input, { target: { value: "123456" } });
+    expect(hk2Input.value).toBe("123456");
+
+    // Simulate invalid input
+    fireEvent.change(hk2Input, { target: { value: "123" } }); // Invalid length
+    expect(screen.getByText("HKID number is invalid")).toBeInTheDocument();
+  });
+
+  it("validates and updates hk3 field correctly", () => {
+    mockUseSelector({
+      fielderror: {
+        error: null,
+      },
+    });
+
+    render(<HKID {...mockProps} />);
+
+    const hk3Input = screen.getByRole("textbox", { name: "hkid_field_3" });
+
+    // Simulate valid input
+    fireEvent.change(hk3Input, { target: { value: "A" } });
+    expect(hk3Input.value).toBe("A");
+
+    // Simulate invalid input
+    fireEvent.change(hk3Input, { target: { value: "#" } }); // Invalid character
+    expect(screen.getByText("HKID number is invalid")).toBeInTheDocument();
+  });
+
+  it("displays a tick mark for a valid HKID", () => {
+    mockUseSelector({
+      fielderror: {
+        error: null,
+      },
+    });
+
+    render(<HKID {...mockProps} />);
+
+    const hk1Input = screen.getByRole("textbox", { name: "hkid_field_1" });
+    const hk2Input = screen.getByRole("textbox", { name: "hkid_field_2" });
+    const hk3Input = screen.getByRole("textbox", { name: "hkid_field_3" });
+
+    // Input valid HKID parts
+    fireEvent.change(hk1Input, { target: { value: "A" } });
+    fireEvent.change(hk2Input, { target: { value: "123456" } });
+    fireEvent.change(hk3Input, { target: { value: "7" } });
+
+    // Verify that the tick mark is displayed
+    expect(screen.getByText("HKID").previousSibling).toHaveClass("tick-class");
+
+    // Check that callback is triggered
+    expect(mockProps.handleCallback).toHaveBeenCalledWith(
+      mockProps.data,
+      "A1234567"
+    );
+  });
+
+  it("disables the continue button on error", () => {
+    mockUseSelector({
+      fielderror: {
+        error: "HKID number is invalid",
+      },
+    });
+
+    render(<HKID {...mockProps} />);
+
+    // Check error message
+    expect(screen.getByText("HKID number is invalid")).toBeInTheDocument();
+
+    // Validate that the dispatch for disabling the continue button is called
+    expect(mockDispatch).toHaveBeenCalledWith({
+      type: "continue-validation-slice/getContinueEnableState",
+      payload: false,
+    });
+  });
+});
