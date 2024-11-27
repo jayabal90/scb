@@ -1,0 +1,708 @@
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  KeyWithAnyModel,
+  LovInputModel,
+  LovInputValModel,
+  StoreModel,
+  RadioDependecyModel
+} from "../../../utils/model/common-model";
+import "./selection-box.scss";
+import { fieldError, isFieldUpdate, fieldIdAppend, getUrl } from "../../../utils/common/change.utils";
+import { fieldErrorAction } from "../../../utils/store/field-error-slice";
+import { stagesAction } from "../../../utils/store/stages-slice";
+import { ValueUpdateAction } from "../../../utils/store/value-update-slice";
+import { CONSTANTS } from "../../../utils/common/constants";
+import { lovDescAction } from "../../../utils/store/lov-desc-slice";
+import { getFields } from "./selection-box.utils";
+import errorMsg from "../../../assets/_json/error.json";
+import renderComponent from "../../../modules/dashboard/fields/renderer";
+import { lastAction } from "../../../utils/store/last-accessed-slice";
+import { ContinueBtnAction } from "../../../utils/store/continue-validation-slice";
+
+const SelectionBox = (props: KeyWithAnyModel) => {
+  const [error, setError] = useState('');
+  const [field, setField] = useState([]);
+  const lovSelector = useSelector((state: StoreModel) => state.lov);
+  const parentChildToggleSelector = useSelector((state: StoreModel) => state.stages.parentChildFields)
+  const cityDynamicFieldSelector = useSelector((state: StoreModel) => state.stages.cityDynamicField)
+  const [selectedOption, setSelectedOption] = useState<Array<LovInputValModel>>(
+    []
+  );
+
+  let placeHolderValue
+  if(props.data.rwb_label_name === "loan_purpose" ){
+    placeHolderValue = "Loan Purpose*";
+  } else{
+    placeHolderValue = `${props.data.rwb_label_name}*`;
+  }
+  const [placeholder, setPlaceHolder] = useState(placeHolderValue)
+  const [radioDependency, setRadioDependency] = useState<RadioDependecyModel | null>();
+  const fieldErrorSelector = useSelector(
+    (state: StoreModel) => state.fielderror.error
+  );
+
+  const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
+  const [show, hide] = useState(false);
+  const [selectedValue, setSelectedValue] = useState<Array<LovInputValModel>>(
+    []
+  );
+  const language = getUrl.getLanguageInfo("lang")
+  const [search, setSearch] = useState("");
+  const dispatch = useDispatch();
+  const dependencyFieldsSelector = useSelector(
+    (state: StoreModel) => state.stages.dependencyFields
+  );
+  const userInputSelector = useSelector(
+    (state: StoreModel) => state.stages.userInput
+  );
+  //using declaration page
+  const relatedParty=userInputSelector.applicants[0].related_party;
+
+  const countryOfTaxResidence: KeyWithAnyModel = [
+    {
+      'label': 'country_of_tax_residence', 'value': ''
+    },
+    { 'label': 'country_of_tax_residence_1', 'value': '' },
+    { 'label': 'country_of_tax_residence_2', 'value': '' },
+    { 'label': 'country_of_tax_residence_3', 'value': '' },
+    { 'label': 'country_of_tax_residence_4', 'value': '' },
+  ];
+  // let stageComponents: any;
+
+  //const countryOfTaxResidenceSelectedvalueSelector = useSelector((state: StoreModel) => state.tax.countryOfTaxResidenceSelectedvalue);
+
+  let isCountryTaxResideancyField: boolean = false;
+  let logicalFieldSplittedArray = props.data.logical_field_name.split("_");
+  if (
+    logicalFieldSplittedArray &&
+    logicalFieldSplittedArray.length > 4 &&
+    logicalFieldSplittedArray[2] === "tax"
+  ) {
+    isCountryTaxResideancyField = true;
+  }
+
+  useEffect(() => {
+    if (props.data.logical_field_name === 'education_level') {
+      setPlaceHolder(language === CONSTANTS.LANG_EN ? 'Education Level' : language === CONSTANTS.LANG_CN ? '教育程度' : '教育程度')
+    }      // eslint-disable-next-line react-hooks/exhaustive-deps  
+  }, [])
+
+  useEffect(() => {
+    const currentFieldLovRes: Array<KeyWithAnyModel> = lovSelector.lov.filter(
+      (res: LovInputModel) => {
+        return (
+          res.label ===
+          (isCountryTaxResideancyField
+            ? "country_of_tax_residence"
+            : props.data.logical_field_name)
+        );
+      }
+    );
+    let preSelectedCode: string | null = null;
+
+   /* Removed values not show again when come back to the page */
+    // if (/*stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_3 &&*/ (props.data.logical_field_name === "financial_institution" || props.data.logical_field_name === "financial_product")) {
+    //   if (stageSelector[0].stageInfo.applicants[0][fieldIdAppend(props)]) {
+    //     preSelectedCode = 
+    //     stageSelector[0].stageInfo.applicants[0][fieldIdAppend(props)];
+    //     // userInputSelector.applicants[0][fieldIdAppend(props)]
+    //   } else {
+    //     preSelectedCode = userInputSelector.applicants[0][fieldIdAppend(props)];
+    //   }
+    // } else {
+      if (userInputSelector.applicants[0][fieldIdAppend(props)]) {
+        preSelectedCode = userInputSelector.applicants[0][fieldIdAppend(props)];
+      }
+    // }
+ /* Removed values not show again when come back to the page */
+
+
+
+    // if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5) {
+    //   if (userInputSelector.applicants[0][fieldIdAppend(props)]) {
+    //     preSelectedCode =
+    //       userInputSelector.applicants[0][fieldIdAppend(props)];
+    //   }
+    // } else {
+    //   if (stageSelector[0].stageInfo.applicants[0][fieldIdAppend(props)]) {
+    //     preSelectedCode =
+    //       stageSelector[0].stageInfo.applicants[0][fieldIdAppend(props)];
+    //   } else {
+    //     preSelectedCode =
+    //       userInputSelector.applicants[0][fieldIdAppend(props)];
+    //   }
+    // }
+
+
+
+    /* pre populated fields in BD-4 screen start */
+
+    if (props.data.logical_field_name === "purpose_of_account_rwb") {
+      if (stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name] === null
+        || stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name] === undefined) {
+        preSelectedCode = "IP"
+        const lovDataValue = findCodeDesc(preSelectedCode)
+        if (lovDataValue)
+          addLovData(props.data.logical_field_name, lovDataValue.CODE_DESC, lovDataValue.CODE_VALUE)
+
+      }
+    }
+
+    if (props.data.logical_field_name === "rationale") {
+      if (stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name] === null
+        || stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name] === undefined) {
+        preSelectedCode = "01"
+        const lovDataValue = findCodeDesc(preSelectedCode)
+        if (lovDataValue)
+          addLovData(props.data.logical_field_name, lovDataValue.CODE_DESC, lovDataValue.CODE_VALUE)
+      }
+    }
+    /* pre populated fields in BD-4 screen end */
+    if (currentFieldLovRes.length > 0) {
+      let dropDownData = JSON.parse(
+        JSON.stringify(currentFieldLovRes[0].value)
+      );
+      let preVal: Array<LovInputValModel> = [];
+      dropDownData.map((item: LovInputValModel) => {
+        if (item.CODE_VALUE === preSelectedCode) {
+          item["checked"] = true;
+          preVal.push(item);
+        }
+        else {
+          item["checked"] = false;
+        }
+        return item;
+      });
+      if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_1) {
+        // let countryOfTaxResidenceArr = getCountrySelector();
+        // countryOfTaxResidenceArr.map((item: any, index: number) => {
+        //   if (item.label === props.data.logical_field_name) {
+        //     item.value = userInputSelector.applicants[0].country_of_tax_residence;
+        //   }
+        //   else if (item.label === props.data.logical_field_name + index + 1) {
+        //     item.value = userInputSelector.applicants[0][props.data.logical_field_name + '_' + index + 1]
+
+        //   }
+        //   return item
+        // })
+       // dispatch(taxAction.updateCountryOfTaxResidenceSelectedvalue(countryOfTaxResidenceArr))
+      }
+      setSelectedOption(dropDownData);
+      if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5) {
+        if (props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_3 && cityDynamicFieldSelector.cityValue === 'city_3') {
+          setSelectedValue([]);
+          dropDownData.map((item: LovInputValModel) => {
+            if (item.CODE_VALUE === preSelectedCode) {
+              item["checked"] = false;
+            }
+            return item;
+          });
+        } else if (props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4 && cityDynamicFieldSelector.cityValue === 'city_4') {
+          setSelectedValue([]);
+          dropDownData.map((item: LovInputValModel) => {
+            if (item.CODE_VALUE === preSelectedCode) {
+              item["checked"] = false;
+            }
+            return item;
+          });
+        } else if (preVal.length > 0) {
+          setSelectedValue(preVal);
+        }
+      } else if (preVal.length > 0) {
+        setSelectedValue(preVal);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lovSelector.lov, props.data.logical_field_name, dependencyFieldsSelector, cityDynamicFieldSelector]);
+
+  const noResults = (selectedOption && selectedOption.filter((item: LovInputValModel) =>
+    item.CODE_DESC.toLowerCase().includes(search.toLowerCase())).length > 0);
+  const filtered = selectedOption && selectedOption.filter((item: LovInputValModel) =>
+    item.CODE_DESC.toLowerCase().includes(search.toLowerCase()));
+  const finalOptions = search === "" ? selectedOption : filtered;
+  const filteredOptions = finalOptions.filter(item => item.CODE_VALUE !=='LP16' && item.CODE_VALUE !=='72' && item.CODE_VALUE !=='84' );
+
+  const findCodeDesc = (preSelectedCode: string) => {
+    const currentFieldLovRes: Array<KeyWithAnyModel> = lovSelector.lov.filter(
+      (res: LovInputModel) => {
+        return (
+          res.label ===
+          (isCountryTaxResideancyField
+            ? "country_of_tax_residence"
+            : props.data.logical_field_name)
+        );
+      }
+    );
+    if (currentFieldLovRes.length > 0) {
+      const lovData = JSON.parse(
+        JSON.stringify(currentFieldLovRes[0].value)
+      );
+      return lovData.find((item: LovInputValModel) => (
+        item.CODE_VALUE === preSelectedCode && item.CODE_DESC
+      ));
+    }
+  }
+
+  useEffect(() => {
+    if (fieldError(fieldErrorSelector, props)) {
+      setError(`${language === CONSTANTS.LANG_EN ? errorMsg.selectError : language === CONSTANTS.LANG_CN ? errorMsg.selectError_CN : errorMsg.selectError_HK}${props.data.rwb_label_name}`);
+    } else {
+      setError('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldErrorSelector]);
+  useEffect(()=>{
+    if(selectedValue.length > 0 ){
+        dispatch(ContinueBtnAction.getContinueEnableState(true));
+        
+      } else{
+        dispatch(ContinueBtnAction.getContinueEnableState(false));
+
+      }
+       // eslint-disable-next-line react-hooks/exhaustive-deps  
+  },[selectedValue.length > 0])
+
+  useEffect(() => {
+    setError('');
+    var lovData:any= lovSelector.lov.filter((item:any)=>item.label === props.data.logical_field_name);
+    let filteredLovData:any= lovData.length > 0 ? JSON.parse(JSON.stringify(lovData[0].value)) : [];
+    let filteredData= filteredLovData.filter((item:any)=>{
+      if(userInputSelector && userInputSelector.applicants[0] && userInputSelector.applicants[0][props.data.logical_field_name] && item.CODE_VALUE === userInputSelector.applicants[0][props.data.logical_field_name]) {
+        return item
+      }
+      else if(item.CODE_VALUE === props.data.ui_defaulted_value) {
+        return item
+      }
+    })
+    let updatedSelectedOption = filteredData.map((item:any) => ({
+      ...item,
+      checked: true       
+    }));
+    let selectedOptions = lovData.length > 0 ? JSON.parse(JSON.stringify(lovData[0].value)) : [];
+
+    for(let i in selectedOptions) {
+      if(userInputSelector && userInputSelector.applicants[0] && userInputSelector.applicants[0][props.data.logical_field_name] && selectedOptions[i].CODE_VALUE === userInputSelector.applicants[0][props.data.logical_field_name]){
+        selectedOptions[i].checked= true;
+      }
+      else if(selectedOptions[i].CODE_VALUE === props.data.ui_defaulted_value){
+        selectedOptions[i].checked= true;
+      }
+    }
+    if(props.data.ui_defaulted_value || userInputSelector && userInputSelector.applicants[0] && userInputSelector.applicants[0][props.data.logical_field_name]) {
+      setSelectedValue(updatedSelectedOption);
+      setSelectedOption(selectedOptions);
+      dispatch(
+        lovDescAction.addLovData({
+          fieldData: {
+            fieldName: props.data.logical_field_name,
+            code_desc: updatedSelectedOption.length>0 && updatedSelectedOption[0]["CODE_DESC"] ?  updatedSelectedOption[0]["CODE_DESC"] : '',
+            code_value: updatedSelectedOption.length>0 && updatedSelectedOption[0]["CODE_VALUE"] ? updatedSelectedOption[0]["CODE_VALUE"] : ''
+          }
+        })
+      );
+    }
+    if (
+      stageSelector &&
+      stageSelector[0] &&
+      stageSelector[0].stageInfo &&
+      stageSelector[0].stageInfo.applicants[0]
+    ) {
+      const userInputResponse = userInputSelector.applicants[0][props.data.logical_field_name];
+      const fieldValue = userInputResponse || stageSelector[0].stageInfo.applicants[0][ props.data.logical_field_name];
+
+      if ( props.data.logical_field_name === "financial_product" || props.data.logical_field_name === "financial_product_2" || props.data.logical_field_name === "financial_institution" ) {
+        setRadioDependency({ logical_field_name: props.data.logical_field_name, value: fieldValue });
+        props.handleCallback(props.data, fieldValue);
+        dispatch(isFieldUpdate(props, fieldValue, props.data.logical_field_name));
+      }
+      if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5 && userInputSelector.applicants[0][props.data.logical_field_name]) {
+        setRadioDependency({ logical_field_name: props.data.logical_field_name, value: fieldValue });
+        props.handleFieldDispatch(props.data.logical_field_name, fieldValue);
+        dispatch(isFieldUpdate(props, fieldValue, props.data.logical_field_name));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const dropdownHandler = (event: React.MouseEvent<any>) => {
+    /** Added to prevent selecting same country in Tax information starts*/
+    if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_1) {
+      let country_of_tax_residence_values: Array<string> = [];
+      // const countryOfTaxResidenceArr = getCountrySelector();
+      // country_of_tax_residence_values = countryOfTaxResidenceArr.map((item: LovInputModel) => {
+      //   return item.value
+      // })
+      const currentFieldLovRes: Array<KeyWithAnyModel> = lovSelector.lov.filter(
+        (res: LovInputModel) => {
+          return (
+            res.label ===
+            (isCountryTaxResideancyField
+              ? "country_of_tax_residence"
+              : props.data.logical_field_name)
+          );
+        }
+      );
+      if (currentFieldLovRes.length > 0) {
+        let dropDownData = JSON.parse(
+          JSON.stringify(currentFieldLovRes[0].value)
+        );
+        dropDownData = dropDownData.filter((obj: LovInputValModel) => !country_of_tax_residence_values.map(x => JSON.stringify(x)).includes(JSON.stringify(obj['CODE_VALUE'])));
+        setSelectedOption(dropDownData);
+      }
+    }
+    /** Added to prevent selecting same country in Tax information ends*/
+    event.currentTarget.firstChild.focus();
+    hide(true);
+    setSearch("");
+  };
+
+  const close = () => {
+    hide(false);
+  };
+
+  useEffect(() => {
+    if (radioDependency) {
+      if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5) {
+        if (radioDependency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1 || radioDependency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_3 || radioDependency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2 || radioDependency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4) {
+          parentChildInvestmentSelect(radioDependency, false)
+        }
+      } else if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_3 || stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_4) {
+        if (radioDependency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION || radioDependency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.WORK_TYPE_2) {
+          parentChildInvestmentSelect(radioDependency, false);
+        }
+        if (props.data.logical_field_name === "education_level") {
+          dispatch(stagesAction.updateInvestmentToggle());
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [radioDependency])
+
+  const parentChildInvestmentSelect = (radioDependency: RadioDependecyModel, removedata?: boolean) => {
+    if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5) {
+      dispatch(getFields(stageSelector, radioDependency, userInputSelector, parentChildToggleSelector, removedata))
+    } else if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_3) {
+      const stageComponents = dispatch(getFields(stageSelector, radioDependency, userInputSelector, parentChildToggleSelector, removedata))
+      setField(stageComponents)
+    } else if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_4) {
+      dispatch(getFields(stageSelector, radioDependency, userInputSelector, parentChildToggleSelector, removedata))
+    }
+  }
+
+  const addUserInput = (data: LovInputValModel, logical_field_name: string) => {
+    const previousSelectedOption = [...selectedOption];
+    setRadioDependency({ logical_field_name: logical_field_name, value: data.CODE_VALUE });
+    const valueChange = previousSelectedOption.some((item) => item.CODE_VALUE === data.CODE_VALUE && data.checked === false);
+    if (valueChange) {
+      dispatch(ValueUpdateAction.getChangeUpdate({ id: stageSelector[0].stageId!, changes: true }));
+    }
+    let updatedSelectedOption = previousSelectedOption.map(
+      (item: LovInputValModel) => {
+        if (item.CODE_DESC === data["CODE_DESC"]) {
+          item["checked"] = true;
+        } else {
+          item["checked"] = false;
+        }
+        return item;
+      }
+    );
+    if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_1) {
+      // const countryOfTaxResidenceArr = getCountrySelector();
+      // countryOfTaxResidenceArr.map((item: KeyWithAnyModel) => {
+      //   if (item.label === logical_field_name) {
+      //     item.value = data['CODE_VALUE']
+      //   }
+      //   return item;
+      // })
+
+    //  dispatch(taxAction.updateCountryOfTaxResidenceSelectedvalue(countryOfTaxResidenceArr))
+    }
+    setSelectedOption(updatedSelectedOption);
+
+    let value: Array<LovInputValModel> = [data];
+    setSelectedValue(value);
+    if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5) {
+      if (logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_3) {
+        dispatch(stagesAction.modifyData({ 'label': CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_3, 'value': '' }));
+        dispatch(stagesAction.updateDynamicCityField({ 'label': CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_3, 'value': 'city_3' }))
+      } else if (logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4) {
+        dispatch(stagesAction.modifyData({ 'label': CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, 'value': '' }));
+        dispatch(stagesAction.updateDynamicCityField({ 'label': CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, 'value': 'city_4' }))
+      }
+    }
+
+    hide(false);
+
+    addLovData(logical_field_name, data["CODE_DESC"], data["CODE_VALUE"])
+    setError('');
+    if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_3/* && (props.data.logical_field_name === "financial_institution" || props.data.logical_field_name === "financial_product")*/)
+      dispatch(stagesAction.updateDynamicFields({ 'label': logical_field_name, 'value': data["CODE_VALUE"] }))
+  };
+
+  const addLovData = (logical_field_name: string, code_desc: string, code_value: string) => {
+    dispatch(
+      lovDescAction.addLovData({
+        fieldData: {
+          fieldName: logical_field_name,
+          code_desc: code_desc,
+          code_value: code_value
+        }
+      })
+    );
+  }
+
+  const removeSelectedValues = (
+    event: React.MouseEvent<HTMLDivElement, MouseEvent>,
+    data: LovInputValModel,
+    logical_field_name: string
+  ) => {
+    event.stopPropagation();
+    event.isPropagationStopped();
+
+    const previousSelectedValue = [...selectedValue];
+
+    let fieldIndex = previousSelectedValue.findIndex(
+      (item: LovInputValModel) => item.CODE_VALUE === data["CODE_VALUE"]
+    );
+    if (fieldIndex !== -1) {
+      previousSelectedValue.splice(fieldIndex, 1);
+    }
+    setSelectedValue(previousSelectedValue);
+
+    const previousSelectedOption = [...selectedOption];
+    let result = previousSelectedOption.map((item: LovInputValModel) => {
+      if (item.CODE_VALUE === data["CODE_VALUE"]) {
+        item["checked"] = !item["checked"];
+      }
+      return item;
+    });
+    if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_1) {
+      // let countryOfTaxResidenceArr = getCountrySelector();
+      // countryOfTaxResidenceArr = countryOfTaxResidenceArr.filter((item: any) => {
+      //   if (item.label === logical_field_name) {
+      //     item.value = ''
+      //   } else {
+      //     return item
+      //   }
+      //   return item
+      // })
+
+     // dispatch(taxAction.updateCountryOfTaxResidenceSelectedvalue(countryOfTaxResidenceArr))
+    }
+    setSelectedOption(result);
+    dispatch(ValueUpdateAction.getChangeUpdate({ id: stageSelector[0].stageId!, changes: true }));
+    dispatch(isFieldUpdate(props, '', logical_field_name));
+   //props.handleCallback(logical_field_name, '');
+    props.handleCallback(props.data, '');
+    if ((props.data.mandatory === "Yes" || props.data.mandatory === "Conditional") && data.checked === false) {
+      setError(`${language === CONSTANTS.LANG_EN ? errorMsg.selectError : language === CONSTANTS.LANG_CN ? errorMsg.selectError_CN : errorMsg.selectError_HK}${props.data.rwb_label_name}`);
+    }
+    if ((props.data.mandatory === "Yes" || props.data.mandatory === "Conditional") && data.checked === false && props.data.logical_field_name==="work_type") {
+      setError(`${language === CONSTANTS.LANG_EN ? errorMsg.sourceOfIncome : language === CONSTANTS.LANG_CN ? errorMsg.sourceOfIncome_CN : errorMsg.sourceOfIncome_HK}`);
+    }
+    if ((props.data.mandatory === "Yes" || props.data.mandatory === "Conditional") && data.checked === false && props.data.logical_field_name==="related_party") {
+      setError(`${language === CONSTANTS.LANG_EN ? errorMsg.sourceOfIncome : language === CONSTANTS.LANG_CN ? errorMsg.sourceOfIncome_CN : errorMsg.sourceOfIncome_HK}`);
+    }
+    if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5) {
+      if (logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_3 || logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4) {
+        if (radioDependency) {
+          parentChildInvestmentSelect(radioDependency, true)
+        }
+      }
+    }
+    if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_3 /*&& (props.data.logical_field_name === "financial_institution" || props.data.logical_field_name === "financial_product")*/)
+      dispatch(stagesAction.updateDynamicFields({ 'label': logical_field_name, 'value': '' }))
+  };
+
+  useEffect(() => {
+    const val =
+      selectedValue &&
+      selectedValue.reduce((prev: Array<string>, acc: LovInputValModel) => {
+        prev.push(acc.CODE_VALUE);
+        return prev;
+      }, []);
+    if (val.toString()) {
+      props.handleCallback(props.data, val.toString());
+      dispatch(
+        isFieldUpdate(
+          props,
+          val.toString(),
+          props.data.logical_field_name
+        )
+      );
+    }
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedValue]);
+
+  const removeTaxField = () => {
+  //  dispatch(taxAction.removeTaxField(props.data.logical_field_name));
+    let tax_id_no_logical_name = 'tax_id_no_' + props.data.logical_field_name.split('_')[4]
+    let countryOfTaxResidenceArr = getCountrySelector();
+    // countryOfTaxResidenceArr = countryOfTaxResidenceArr.filter((item: any) => {
+    //   if (item.label === props.data.logical_field_name) {
+    //     item.value = ''
+    //   } else {
+    //     return item
+    //   }
+    //   return item
+    // })
+  //  dispatch(taxAction.updateCountryOfTaxResidenceSelectedvalue(countryOfTaxResidenceArr))
+    dispatch(fieldErrorAction.removeMandatoryFields([props.data.logical_field_name, tax_id_no_logical_name]));
+    dispatch(
+      stagesAction.removeAddToggleField({
+        removeFields: [props.data.logical_field_name, tax_id_no_logical_name],
+        newFields: [],
+      })
+    );
+  }
+
+  const getCountrySelector = () => {
+  return {};
+    //return countryOfTaxResidenceSelectedvalueSelector ? JSON.parse(countryOfTaxResidenceSelectedvalueSelector) : countryOfTaxResidence
+  }
+
+  const handleCallback = (fieldName: string, value: string | number) => {
+    props.handleCallback(fieldName, value);
+  };
+  const handleFieldDispatch = (fieldName: string, value: string | number) => {
+    props.handleFieldDispatch(fieldName, value);
+  };
+
+  const focusHandler = (fieldName: string, event: React.FocusEvent<HTMLInputElement>) => {
+    dispatch(lastAction.getField(fieldName));
+  };
+  let disable:boolean= false;
+  if(props.data.logical_field_name === 'res_country' || props.data.logical_field_name === 'off_country') {
+    disable= true
+  }
+  return (
+    <>
+    {/* {relatedParty!=='N' && */}
+      <div className="dropdown-select">
+        <label htmlFor={props.data.logical_field_name}>
+          {(selectedValue.length > 0 && !error) && <div className="tick-class"></div>}
+          <span style={(selectedValue.length > 0 && !error)?{marginLeft: "2em"}:{marginLeft:'0'}}> {props.data.rwb_label_name}</span>
+          {isCountryTaxResideancyField && (
+            <span onClick={() => removeTaxField()} className="remove-button">
+            </span>
+          )}
+        </label>
+        <div
+          className={error ? `errBorder dropdown-select__field` + (props.data.logical_field_name !== 'country_of_tax_residence' ? stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_1 ? ' remove__tax' : '' : '') : `dropdown-select__field dropdown-non-select__field` + (props.data.logical_field_name !== 'country_of_tax_residence' ? stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_1 ? ' remove__tax' : '' : '')}
+          onClick={!disable ? (event) => dropdownHandler(event) : (e)=>console.log(e)}
+          style={{cursor: disable ? 'not-allowed':'pointer'}}
+          // onClick={(event) => dropdownHandler(event)}
+          onFocus={focusHandler.bind(this, props.data.logical_field_name)}
+        >
+          {selectedValue &&
+            selectedValue.length > 0 &&
+            selectedValue.map((item: LovInputValModel) => {
+              return (
+                <div
+                  className="dropdown-select__fieldlabel"
+                //  className= { `dropdown-select__fieldlabel` + (props.data.logical_field_name === 'res_country' ? 'disabled': '')}
+                  key={item.CODE_VALUE}
+                >
+                  <span>{item.CODE_DESC}</span>
+                  <span
+                    className="multi-close"                    
+                    onClick={!disable ? (
+                      e: React.MouseEvent<HTMLDivElement, MouseEvent>
+                    ) => removeSelectedValues(e, item, props.data.logical_field_name) : (e)=>console.log(e)}
+                    // onClick={(
+                    //   e: React.MouseEvent<HTMLDivElement, MouseEvent>
+                    // ) => removeSelectedValues(e, item, props.data.logical_field_name)}
+                  ></span>
+                </div>
+              );
+            })}
+          {!(selectedValue && selectedValue.length > 0) && (
+            <input
+              type="text"
+              className="dropdown-select__input"
+              id={fieldIdAppend(props)}
+              placeholder={placeholder}
+              // disabled={!props.data.editable}
+            />
+          )}
+        </div>
+        {show && selectedOption && (
+          <div className="dropdown-select__background">
+            <div className="dropdown-select__popup">
+              <div className="dropdown-select__header">
+                <div>{props.data.rwb_label_name}</div>
+                <div className="close" onClick={close}></div>
+              </div>
+
+              <div className="dropdown-select__search">
+                <label htmlFor="search"></label>
+                <input
+                  name="search"
+                  className="dropdown-select__search"
+                  type="search"
+                  placeholder={language === CONSTANTS.LANG_EN ? "Search" : language === CONSTANTS.LANG_CN ? "搜寻" : "搜尋"}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </div>
+              {
+                <>
+                  <div className="dropdown-select__expand">
+                    {noResults ? 
+                    // (selectedOption
+                    //   .filter((item: LovInputValModel) =>
+                    //     item.CODE_DESC.toLowerCase().includes(search.toLowerCase())
+                    //   ).length > 0) ?
+                    //   selectedOption
+                    //     .filter((item: LovInputValModel) =>
+                    //       item.CODE_DESC.toLowerCase().includes(search.toLowerCase())
+                    //     )
+                    filteredOptions.map((item: LovInputValModel, index: number) => {
+                        return (
+                          <div key={index} className="dropdown-select__item">
+                            <input
+                              type="radio"
+                              checked={item.checked}
+                              onChange={() => addUserInput(item, props.data.logical_field_name)}
+                              onClick={() => {
+                                //do nothing
+                              }}
+                              value={item.CODE_VALUE}
+                              id={item.CODE_VALUE + index}
+                              name={item.CODE_VALUE + index}
+                            />
+                            <label htmlFor={item.CODE_VALUE + index}>
+                              {item.CODE_DESC}
+                            </label>
+                          </div>
+                        );
+                    }) : <div className="dropdown-select__noResult"> {language === CONSTANTS.LANG_EN ? "No Results" : language === CONSTANTS.LANG_CN ? "没有结果" : "沒有結果"} </div>}
+                  </div>
+                </>
+              }
+            </div>
+          </div>
+        )}
+      </div >
+      {field && stageSelector[0].stageId !== "bd-5" &&
+        field.map((currentSection: KeyWithAnyModel, index: number) => {
+          return renderComponent(
+            currentSection,
+            index,
+            handleCallback,
+            handleFieldDispatch,
+            props.value
+          );
+        })
+      }
+      {error && 
+        <div className="error-msg">
+          {error}
+        </div>
+      }
+    </>
+  );
+};
+
+export default SelectionBox;
