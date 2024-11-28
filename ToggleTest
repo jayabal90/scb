@@ -8,43 +8,40 @@ jest.mock("react-redux", () => ({
   useSelector: jest.fn(),
 }));
 
-jest.mock("react", () => {
-  const actualReact = jest.requireActual("react");
-  return {
-    ...actualReact,
-    useState: jest.fn(),
-  };
-});
-
 describe("Toggel Component", () => {
-  let mockDispatch, mockSetState;
+  let mockDispatch;
 
   beforeEach(() => {
     mockDispatch = jest.fn();
-    mockSetState = jest.fn();
     useDispatch.mockReturnValue(mockDispatch);
-    useSelector.mockImplementation((callback) => {
-      return callback({
+    useSelector.mockImplementation((selector) =>
+      selector({
         stages: {
           stages: [
             {
               stageInfo: {
                 applicants: [
-                  { marketing_email: "Y", marketing_phone_others: "N" },
+                  {
+                    marketing_email: "Y",
+                    marketing_phone_others: "N",
+                    marketing_phone_all: "Y",
+                  },
                 ],
               },
             },
           ],
           userInput: {
-            applicants: [{ marketing_email: "N", marketing_phone_others: "Y" }],
+            applicants: [
+              {
+                marketing_email: "N",
+                marketing_phone_others: "Y",
+                marketing_phone_all: "N",
+              },
+            ],
           },
         },
-      });
-    });
-    jest.spyOn(React, "useState").mockImplementation((initialValue) => [
-      initialValue,
-      mockSetState,
-    ]);
+      })
+    );
   });
 
   afterEach(() => {
@@ -63,31 +60,44 @@ describe("Toggel Component", () => {
     handleFieldDispatch: jest.fn(),
   };
 
-  it("should render the component with default props", () => {
+  it("should render the component with initial state", () => {
     render(<Toggel {...props} />);
-    expect(screen.getByText("Marketing Email")).toBeInTheDocument();
+    const label = screen.getByText("Marketing Email");
     const checkbox = screen.getByRole("checkbox", { name: "marketing_email" });
+
+    expect(label).toBeInTheDocument();
     expect(checkbox).toBeInTheDocument();
-    expect(checkbox).not.toBeChecked(); // Initially false
+    expect(checkbox).not.toBeChecked(); // Default state from mock userInput
   });
 
-  it("should update the state and call callbacks on toggle change", () => {
+  it("should call handleCallback and dispatch on toggle change to checked", () => {
     render(<Toggel {...props} />);
     const checkbox = screen.getByRole("checkbox", { name: "marketing_email" });
 
     // Simulate toggle to checked
     fireEvent.click(checkbox);
-    expect(mockSetState).toHaveBeenCalledWith(true); // Update state
-    expect(props.handleCallback).toHaveBeenCalledWith(props.data, "Y"); // Callback with YES
-    expect(mockDispatch).toHaveBeenCalled(); // Dispatch called
 
-    // Simulate toggle to unchecked
-    fireEvent.click(checkbox);
-    expect(mockSetState).toHaveBeenCalledWith(false); // Update state
-    expect(props.handleCallback).toHaveBeenCalledWith(props.data, "N"); // Callback with NO
+    expect(checkbox).toBeChecked();
+    expect(props.handleCallback).toHaveBeenCalledWith(props.data, "Y");
+    expect(props.handleFieldDispatch).toHaveBeenCalledWith("marketing_email", "Y");
+    expect(mockDispatch).toHaveBeenCalled();
   });
 
-  it("should disable the related toggle based on conditions", () => {
+  it("should call handleCallback and dispatch on toggle change to unchecked", () => {
+    render(<Toggel {...props} />);
+    const checkbox = screen.getByRole("checkbox", { name: "marketing_email" });
+
+    // Simulate toggle to unchecked
+    fireEvent.click(checkbox); // Checked
+    fireEvent.click(checkbox); // Unchecked
+
+    expect(checkbox).not.toBeChecked();
+    expect(props.handleCallback).toHaveBeenCalledWith(props.data, "N");
+    expect(props.handleFieldDispatch).toHaveBeenCalledWith("marketing_email", "N");
+    expect(mockDispatch).toHaveBeenCalled();
+  });
+
+  it("should disable related toggle buttons based on conditions", () => {
     const updatedProps = {
       ...props,
       data: { ...props.data, logical_field_name: "marketing_phone_others" },
@@ -96,21 +106,32 @@ describe("Toggel Component", () => {
     render(<Toggel {...updatedProps} />);
     const checkbox = screen.getByRole("checkbox", { name: "marketing_phone_others" });
 
-    const relatedField = document.createElement("input");
-    relatedField.setAttribute("name", "marketing_phone_all");
-    relatedField.setAttribute("type", "checkbox");
-    document.body.appendChild(relatedField);
+    const relatedCheckbox = document.createElement("input");
+    relatedCheckbox.setAttribute("name", "marketing_phone_all");
+    relatedCheckbox.setAttribute("type", "checkbox");
+    document.body.appendChild(relatedCheckbox);
 
-    fireEvent.click(checkbox); // Enable current toggle
-    expect(relatedField.disabled).toBe(true);
+    // Simulate enabling `marketing_phone_others`
+    fireEvent.click(checkbox);
 
-    fireEvent.click(checkbox); // Disable current toggle
-    expect(relatedField.disabled).toBe(false);
+    expect(checkbox).toBeChecked();
+    expect(relatedCheckbox.disabled).toBe(true);
+
+    // Simulate disabling `marketing_phone_others`
+    fireEvent.click(checkbox);
+
+    expect(checkbox).not.toBeChecked();
+    expect(relatedCheckbox.disabled).toBe(false);
   });
 
-  it("should display error message if error state is set", () => {
-    jest.spyOn(React, "useState").mockImplementationOnce(() => ["Error", mockSetState]);
+  it("should display an error message if error state is set", () => {
+    const setStateMock = jest.fn();
+    jest.spyOn(React, "useState").mockImplementation((init) => {
+      if (init === "") return ["Error Message", setStateMock];
+      return [init, setStateMock];
+    });
+
     render(<Toggel {...props} />);
-    expect(screen.getByText("Error")).toBeInTheDocument();
+    expect(screen.getByText("Error Message")).toBeInTheDocument();
   });
 });
