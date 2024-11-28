@@ -1,12 +1,6 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  KeyWithAnyModel,
-  LovInputModel,
-  LovInputValModel,
-  StoreModel,
-  RadioDependecyModel
-} from "../../../utils/model/common-model";
+import {  KeyWithAnyModel, LovInputModel, LovInputValModel,StoreModel,RadioDependecyModel } from "../../../utils/model/common-model";
 import "./selection-box.scss";
 import { fieldError, isFieldUpdate, fieldIdAppend, getUrl } from "../../../utils/common/change.utils";
 import { fieldErrorAction } from "../../../utils/store/field-error-slice";
@@ -68,9 +62,6 @@ const SelectionBox = (props: KeyWithAnyModel) => {
     { 'label': 'country_of_tax_residence_3', 'value': '' },
     { 'label': 'country_of_tax_residence_4', 'value': '' },
   ];
-  // let stageComponents: any;
-
-  //const countryOfTaxResidenceSelectedvalueSelector = useSelector((state: StoreModel) => state.tax.countryOfTaxResidenceSelectedvalue);
 
   let isCountryTaxResideancyField: boolean = false;
   let logicalFieldSplittedArray = props.data.logical_field_name.split("_");
@@ -100,44 +91,6 @@ const SelectionBox = (props: KeyWithAnyModel) => {
       }
     );
     let preSelectedCode: string | null = null;
-
-   /* Removed values not show again when come back to the page */
-    // if (/*stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_3 &&*/ (props.data.logical_field_name === "financial_institution" || props.data.logical_field_name === "financial_product")) {
-    //   if (stageSelector[0].stageInfo.applicants[0][fieldIdAppend(props)]) {
-    //     preSelectedCode = 
-    //     stageSelector[0].stageInfo.applicants[0][fieldIdAppend(props)];
-    //     // userInputSelector.applicants[0][fieldIdAppend(props)]
-    //   } else {
-    //     preSelectedCode = userInputSelector.applicants[0][fieldIdAppend(props)];
-    //   }
-    // } else {
-      if (userInputSelector.applicants[0][fieldIdAppend(props)]) {
-        preSelectedCode = userInputSelector.applicants[0][fieldIdAppend(props)];
-      }
-    // }
- /* Removed values not show again when come back to the page */
-
-
-
-    // if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5) {
-    //   if (userInputSelector.applicants[0][fieldIdAppend(props)]) {
-    //     preSelectedCode =
-    //       userInputSelector.applicants[0][fieldIdAppend(props)];
-    //   }
-    // } else {
-    //   if (stageSelector[0].stageInfo.applicants[0][fieldIdAppend(props)]) {
-    //     preSelectedCode =
-    //       stageSelector[0].stageInfo.applicants[0][fieldIdAppend(props)];
-    //   } else {
-    //     preSelectedCode =
-    //       userInputSelector.applicants[0][fieldIdAppend(props)];
-    //   }
-    // }
-
-
-
-    /* pre populated fields in BD-4 screen start */
-
     if (props.data.logical_field_name === "purpose_of_account_rwb") {
       if (stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name] === null
         || stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name] === undefined) {
@@ -175,18 +128,7 @@ const SelectionBox = (props: KeyWithAnyModel) => {
         return item;
       });
       if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_1) {
-        // let countryOfTaxResidenceArr = getCountrySelector();
-        // countryOfTaxResidenceArr.map((item: any, index: number) => {
-        //   if (item.label === props.data.logical_field_name) {
-        //     item.value = userInputSelector.applicants[0].country_of_tax_residence;
-        //   }
-        //   else if (item.label === props.data.logical_field_name + index + 1) {
-        //     item.value = userInputSelector.applicants[0][props.data.logical_field_name + '_' + index + 1]
-
-        //   }
-        //   return item
-        // })
-       // dispatch(taxAction.updateCountryOfTaxResidenceSelectedvalue(countryOfTaxResidenceArr))
+        
       }
       setSelectedOption(dropDownData);
       if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5) {
@@ -329,10 +271,6 @@ const SelectionBox = (props: KeyWithAnyModel) => {
     /** Added to prevent selecting same country in Tax information starts*/
     if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_1) {
       let country_of_tax_residence_values: Array<string> = [];
-      // const countryOfTaxResidenceArr = getCountrySelector();
-      // country_of_tax_residence_values = countryOfTaxResidenceArr.map((item: LovInputModel) => {
-      //   return item.value
-      // })
       const currentFieldLovRes: Array<KeyWithAnyModel> = lovSelector.lov.filter(
         (res: LovInputModel) => {
           return (
@@ -408,15 +346,7 @@ const SelectionBox = (props: KeyWithAnyModel) => {
       }
     );
     if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_1) {
-      // const countryOfTaxResidenceArr = getCountrySelector();
-      // countryOfTaxResidenceArr.map((item: KeyWithAnyModel) => {
-      //   if (item.label === logical_field_name) {
-      //     item.value = data['CODE_VALUE']
-      //   }
-      //   return item;
-      // })
-
-    //  dispatch(taxAction.updateCountryOfTaxResidenceSelectedvalue(countryOfTaxResidenceArr))
+      
     }
     setSelectedOption(updatedSelectedOption);
 
@@ -478,17 +408,7 @@ const SelectionBox = (props: KeyWithAnyModel) => {
       return item;
     });
     if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_1) {
-      // let countryOfTaxResidenceArr = getCountrySelector();
-      // countryOfTaxResidenceArr = countryOfTaxResidenceArr.filter((item: any) => {
-      //   if (item.label === logical_field_name) {
-      //     item.value = ''
-      //   } else {
-      //     return item
-      //   }
-      //   return item
-      // })
-
-     // dispatch(taxAction.updateCountryOfTaxResidenceSelectedvalue(countryOfTaxResidenceArr))
+      
     }
     setSelectedOption(result);
     dispatch(ValueUpdateAction.getChangeUpdate({ id: stageSelector[0].stageId!, changes: true }));
@@ -537,18 +457,8 @@ const SelectionBox = (props: KeyWithAnyModel) => {
   }, [selectedValue]);
 
   const removeTaxField = () => {
-  //  dispatch(taxAction.removeTaxField(props.data.logical_field_name));
     let tax_id_no_logical_name = 'tax_id_no_' + props.data.logical_field_name.split('_')[4]
     let countryOfTaxResidenceArr = getCountrySelector();
-    // countryOfTaxResidenceArr = countryOfTaxResidenceArr.filter((item: any) => {
-    //   if (item.label === props.data.logical_field_name) {
-    //     item.value = ''
-    //   } else {
-    //     return item
-    //   }
-    //   return item
-    // })
-  //  dispatch(taxAction.updateCountryOfTaxResidenceSelectedvalue(countryOfTaxResidenceArr))
     dispatch(fieldErrorAction.removeMandatoryFields([props.data.logical_field_name, tax_id_no_logical_name]));
     dispatch(
       stagesAction.removeAddToggleField({
@@ -579,7 +489,7 @@ const SelectionBox = (props: KeyWithAnyModel) => {
   }
   return (
     <>
-    {/* {relatedParty!=='N' && */}
+ 
       <div className="dropdown-select">
         <label htmlFor={props.data.logical_field_name}>
           {(selectedValue.length > 0 && !error) && <div className="tick-class"></div>}
@@ -650,14 +560,6 @@ const SelectionBox = (props: KeyWithAnyModel) => {
                 <>
                   <div className="dropdown-select__expand">
                     {noResults ? 
-                    // (selectedOption
-                    //   .filter((item: LovInputValModel) =>
-                    //     item.CODE_DESC.toLowerCase().includes(search.toLowerCase())
-                    //   ).length > 0) ?
-                    //   selectedOption
-                    //     .filter((item: LovInputValModel) =>
-                    //       item.CODE_DESC.toLowerCase().includes(search.toLowerCase())
-                    //     )
                     filteredOptions.map((item: LovInputValModel, index: number) => {
                         return (
                           <div key={index} className="dropdown-select__item">
@@ -685,22 +587,6 @@ const SelectionBox = (props: KeyWithAnyModel) => {
           </div>
         )}
       </div >
-      {field && stageSelector[0].stageId !== "bd-5" &&
-        field.map((currentSection: KeyWithAnyModel, index: number) => {
-          return renderComponent(
-            currentSection,
-            index,
-            handleCallback,
-            handleFieldDispatch,
-            props.value
-          );
-        })
-      }
-      {error && 
-        <div className="error-msg">
-          {error}
-        </div>
-      }
     </>
   );
 };
