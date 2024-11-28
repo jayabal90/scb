@@ -101,20 +101,14 @@ const Toggel =(props:KeyWithAnyModel)=>{
         }
         //End Disable toggle button based on selection other button 
         
-        console.log(checkedValue)
         props.handleCallback(props.data, checkedValue);
         dispatch(isFieldUpdate(props, checkedValue, fieldName));
         props.handleFieldDispatch(fieldName, checkedValue);
         setError('');
       }
 
-      const bindHandler = (fieldName: string, event: any) => {
-        if (event.target.validity.valid) {
-          const fieldValue = event.target.value;
-          //dispatch(isFieldUpdate(props, fieldValue, fieldName));
-          //dispatch(isFieldValueUpdate(props, stageSelector, fieldValue));
-        }
-      };
+     
+      
     return (
         <>
            <div className="toggle">
@@ -130,10 +124,8 @@ const Toggel =(props:KeyWithAnyModel)=>{
                            minLength={props.data.min_length}
                            maxLength={props.data.length}
                            pattern={props.data.regex ? props.data.regex : ""}
-                        //    defaultChecked={defaultCheck}
                            checked={defaultCheck}
                            onChange={changeHandler.bind(this, props.data.logical_field_name)}
-                           onBlur={bindHandler.bind(this, props.data.logical_field_name)}
                            className={error && 'toggle-error'}
                         />
                     </span>
@@ -150,6 +142,3 @@ const Toggel =(props:KeyWithAnyModel)=>{
 }
 
 export default Toggel;
-
-
-
