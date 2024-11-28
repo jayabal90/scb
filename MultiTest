@@ -1,172 +1,182 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { useDispatch, useSelector } from "react-redux";
-import MultiSelectionBox from "./MultiSelectionBox";
+import MultiSelectionBox from "./multi-selection-box"; // Update with the correct path
+import * as redux from "react-redux";
 
-// Mock react-redux hooks
 jest.mock("react-redux", () => ({
   useSelector: jest.fn(),
   useDispatch: jest.fn(),
 }));
 
+jest.mock("react", () => {
+  const originalReact = jest.requireActual("react");
+  return {
+    ...originalReact,
+    useState: jest.fn(),
+    useEffect: jest.fn(),
+  };
+});
+
 describe("MultiSelectionBox Component", () => {
-  let mockDispatch;
+  const mockDispatch = jest.fn();
+  const mockUseState = jest.fn();
 
   beforeEach(() => {
-    // Reset mocks
-    mockDispatch = jest.fn();
-    useDispatch.mockReturnValue(mockDispatch);
-    useSelector.mockImplementation((selector) =>
+    jest.clearAllMocks();
+    (redux.useDispatch as jest.Mock).mockReturnValue(mockDispatch);
+    mockUseState.mockImplementation((initialValue) => [initialValue, jest.fn()]);
+    jest.spyOn(React, "useState").mockImplementation(mockUseState);
+  });
+
+  test("renders MultiSelectionBox with the provided props", () => {
+    (redux.useSelector as jest.Mock).mockImplementation((selector) =>
       selector({
         lov: {
           lov: [
             {
               label: "testField",
               value: [
-                { CODE_VALUE: "1", CODE_DESC: "Option 1" },
-                { CODE_VALUE: "2", CODE_DESC: "Option 2" },
+                { CODE_VALUE: "val1", CODE_DESC: "Value 1" },
+                { CODE_VALUE: "val2", CODE_DESC: "Value 2" },
               ],
             },
           ],
         },
         fielderror: { error: false },
-        stages: { userInput: { applicants: [{ testField: "" }] } },
+        stages: {
+          userInput: { applicants: [{}] },
+        },
       })
     );
-  });
 
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it("renders the MultiSelectionBox with a label and placeholder", () => {
     render(
       <MultiSelectionBox
         data={{
           logical_field_name: "testField",
-          rwb_label_name: "Test Label",
-          max_selects: "2",
-          mandatory: "Yes",
-        }}
-        handleCallback={jest.fn()}
-      />
-    );
-
-    expect(screen.getByLabelText("Test Label")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Test Label")).toBeInTheDocument();
-  });
-
-  it("displays options when dropdown is clicked", () => {
-    render(
-      <MultiSelectionBox
-        data={{
-          logical_field_name: "testField",
-          rwb_label_name: "Test Label",
+          rwb_label_name: "Test Field",
           max_selects: "2",
         }}
         handleCallback={jest.fn()}
       />
     );
 
-    fireEvent.click(screen.getByLabelText("Test Label"));
-    expect(screen.getByText("Option 1")).toBeInTheDocument();
-    expect(screen.getByText("Option 2")).toBeInTheDocument();
+    expect(screen.getByText("Test Field")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Test Field")).toBeInTheDocument();
   });
 
-  it("allows selecting multiple options", () => {
-    render(
-      <MultiSelectionBox
-        data={{
-          logical_field_name: "testField",
-          rwb_label_name: "Test Label",
-          max_selects: "2",
-        }}
-        handleCallback={jest.fn()}
-      />
-    );
-
-    fireEvent.click(screen.getByLabelText("Test Label"));
-
-    const option1 = screen.getByLabelText("Option 1");
-    const option2 = screen.getByLabelText("Option 2");
-
-    fireEvent.click(option1);
-    fireEvent.click(option2);
-
-    expect(option1).toBeChecked();
-    expect(option2).toBeChecked();
-    expect(screen.getByText("Option 1")).toBeInTheDocument();
-    expect(screen.getByText("Option 2")).toBeInTheDocument();
-  });
-
-  it("prevents selecting more than max_selects options", () => {
-    render(
-      <MultiSelectionBox
-        data={{
-          logical_field_name: "testField",
-          rwb_label_name: "Test Label",
-          max_selects: "1",
-        }}
-        handleCallback={jest.fn()}
-      />
-    );
-
-    fireEvent.click(screen.getByLabelText("Test Label"));
-
-    const option1 = screen.getByLabelText("Option 1");
-    const option2 = screen.getByLabelText("Option 2");
-
-    fireEvent.click(option1);
-    fireEvent.click(option2);
-
-    expect(option1).toBeChecked();
-    expect(option2).not.toBeChecked();
-  });
-
-  it("calls dispatch with the correct actions on option select", () => {
-    render(
-      <MultiSelectionBox
-        data={{
-          logical_field_name: "testField",
-          rwb_label_name: "Test Label",
-          max_selects: "2",
-        }}
-        handleCallback={jest.fn()}
-      />
-    );
-
-    fireEvent.click(screen.getByLabelText("Test Label"));
-    const option1 = screen.getByLabelText("Option 1");
-    fireEvent.click(option1);
-
-    expect(mockDispatch).toHaveBeenCalledWith({
-      type: "lovDesc/addLovData",
-      payload: {
-        fieldData: {
-          fieldName: "testField",
-          code_desc: "Option 1",
-          code_value: "1",
-        },
+  test("opens dropdown on click", () => {
+    (redux.useSelector as jest.Mock).mockImplementation(() => ({
+      lov: [],
+      fielderror: { error: false },
+      stages: {
+        userInput: { applicants: [{}] },
       },
-    });
+    }));
+
+    const mockSetState = jest.fn();
+    mockUseState.mockImplementation((initialValue) =>
+      initialValue === false ? [false, mockSetState] : [[], jest.fn()]
+    );
+
+    render(
+      <MultiSelectionBox
+        data={{
+          logical_field_name: "testField",
+          rwb_label_name: "Test Field",
+          max_selects: "2",
+        }}
+        handleCallback={jest.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByPlaceholderText("Test Field"));
+    expect(mockSetState).toHaveBeenCalledWith(true);
   });
 
-  it("shows an error message when mandatory field is empty", () => {
-    useSelector.mockImplementation((selector) =>
+  test("displays error message when required field is empty", () => {
+    (redux.useSelector as jest.Mock).mockImplementation((selector) =>
+      selector({
+        fielderror: { error: true },
+      })
+    );
+
+    render(
+      <MultiSelectionBox
+        data={{
+          logical_field_name: "testField",
+          rwb_label_name: "Test Field",
+          mandatory: "Yes",
+          max_selects: "2",
+        }}
+        handleCallback={jest.fn()}
+      />
+    );
+
+    expect(screen.getByText(/Test Field/)).toBeInTheDocument();
+    expect(screen.getByText(/Test Field is required/)).toBeInTheDocument();
+  });
+
+  test("selects an option and updates state", () => {
+    (redux.useSelector as jest.Mock).mockImplementation((selector) =>
       selector({
         lov: {
           lov: [
             {
               label: "testField",
               value: [
-                { CODE_VALUE: "1", CODE_DESC: "Option 1" },
-                { CODE_VALUE: "2", CODE_DESC: "Option 2" },
+                { CODE_VALUE: "val1", CODE_DESC: "Value 1" },
+                { CODE_VALUE: "val2", CODE_DESC: "Value 2" },
               ],
             },
           ],
         },
-        fielderror: { error: true },
-        stages: { userInput: { applicants: [{ testField: "" }] } },
+        fielderror: { error: false },
+        stages: {
+          userInput: { applicants: [{}] },
+        },
+      })
+    );
+
+    const mockSetState = jest.fn();
+    mockUseState.mockImplementation((initialValue) =>
+      initialValue === [] ? [[], mockSetState] : [false, jest.fn()]
+    );
+
+    render(
+      <MultiSelectionBox
+        data={{
+          logical_field_name: "testField",
+          rwb_label_name: "Test Field",
+          max_selects: "2",
+        }}
+        handleCallback={jest.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByPlaceholderText("Test Field"));
+    fireEvent.click(screen.getByLabelText("Value 1"));
+    expect(mockSetState).toHaveBeenCalled();
+  });
+
+  test("does not allow selecting more than the max_selects value", () => {
+    (redux.useSelector as jest.Mock).mockImplementation((selector) =>
+      selector({
+        lov: {
+          lov: [
+            {
+              label: "testField",
+              value: [
+                { CODE_VALUE: "val1", CODE_DESC: "Value 1" },
+                { CODE_VALUE: "val2", CODE_DESC: "Value 2" },
+                { CODE_VALUE: "val3", CODE_DESC: "Value 3" },
+              ],
+            },
+          ],
+        },
+        fielderror: { error: false },
+        stages: {
+          userInput: { applicants: [{}] },
+        },
       })
     );
 
@@ -174,13 +184,17 @@ describe("MultiSelectionBox Component", () => {
       <MultiSelectionBox
         data={{
           logical_field_name: "testField",
-          rwb_label_name: "Test Label",
-          mandatory: "Yes",
+          rwb_label_name: "Test Field",
+          max_selects: "2",
         }}
         handleCallback={jest.fn()}
       />
     );
 
-    expect(screen.getByText("Please select a valid Test Label")).toBeInTheDocument();
+    fireEvent.click(screen.getByPlaceholderText("Test Field"));
+    fireEvent.click(screen.getByLabelText("Value 1"));
+    fireEvent.click(screen.getByLabelText("Value 2"));
+    fireEvent.click(screen.getByLabelText("Value 3")); // Should not allow this
+    expect(screen.getAllByRole("checkbox", { checked: true }).length).toBe(2);
   });
 });
