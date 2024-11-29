@@ -21,12 +21,6 @@ const SelectionBox = (props: KeyWithAnyModel) => {
   const parentChildToggleSelector = useSelector((state: StoreModel) => state.stages.parentChildFields)
   const cityDynamicFieldSelector = useSelector((state: StoreModel) => state.stages.cityDynamicField)
   const [selectedOption, setSelectedOption] = useState<Array<LovInputValModel>>([]);
-  let placeHolderValue
-  if(props.data.rwb_label_name === "loan_purpose" ){
-    placeHolderValue = "Loan Purpose*";
-  } else{
-    placeHolderValue = `${props.data.rwb_label_name}*`;
-  }
   const [placeholder, setPlaceHolder] = useState(placeHolderValue)
   const [radioDependency, setRadioDependency] = useState<RadioDependecyModel | null>();
   const fieldErrorSelector = useSelector((state: StoreModel) => state.fielderror.error);
@@ -100,14 +94,7 @@ const SelectionBox = (props: KeyWithAnyModel) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lovSelector.lov, props.data.logical_field_name, dependencyFieldsSelector, cityDynamicFieldSelector]);
-  useEffect(() => {
-    if (fieldError(fieldErrorSelector, props)) {
-      setError(`${language === CONSTANTS.LANG_EN ? errorMsg.selectError : language === CONSTANTS.LANG_CN ? errorMsg.selectError_CN : errorMsg.selectError_HK}${props.data.rwb_label_name}`);
-    } else {
-      setError('');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fieldErrorSelector]);
+ 
   useEffect(()=>{
     if(selectedValue.length > 0 ){
         dispatch(ContinueBtnAction.getContinueEnableState(true));
@@ -208,24 +195,7 @@ const SelectionBox = (props: KeyWithAnyModel) => {
   const close = () => {
     hide(false);
   };
-
-  useEffect(() => {
-    if (radioDependency) {
-      if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5) {
-        if (radioDependency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1 || radioDependency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_3 || radioDependency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2 || radioDependency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4) {
-          parentChildInvestmentSelect(radioDependency, false)
-        }
-      } else if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_3 || stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_4) {
-        if (radioDependency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION || radioDependency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.WORK_TYPE_2) {
-          parentChildInvestmentSelect(radioDependency, false);
-        }
-        if (props.data.logical_field_name === "education_level") {
-          dispatch(stagesAction.updateInvestmentToggle());
-        }
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [radioDependency])
+ 
   const addUserInput = (data: LovInputValModel, logical_field_name: string) => {
     const previousSelectedOption = [...selectedOption];
     setRadioDependency({ logical_field_name: logical_field_name, value: data.CODE_VALUE });
