@@ -1,0 +1,123 @@
+import React from 'react';
+import { render, fireEvent, screen } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import configureStore from 'redux-mock-store';
+import SelectionBox from './SelectionBox';
+import { CONSTANTS } from '../../../utils/common/constants';
+
+const mockStore = configureStore([]);
+
+const initialStoreState = {
+  lov: { lov: [] },
+  stages: {
+    stageId: '',
+    stages: [],
+    cityDynamicField: { cityValue: '' },
+  },
+  fielderror: { error: '' },
+  userInput: { applicants: [{ }] },
+};
+
+const setup = (propsOverride = {}, storeOverride = initialStoreState) => {
+  const store = mockStore(storeOverride);
+  return render(
+    <Provider store={store}>
+      <SelectionBox {...propsOverride} />
+    </Provider>
+  );
+};
+
+describe('SelectionBox Component', () => {
+  // Test case for rendering component with props
+  test('renders SelectionBox with correct label', () => {
+    const props = {
+      data: {
+        logical_field_name: 'education_level',
+        rwb_label_name: 'Education Level',
+      },
+      handleCallback: jest.fn(),
+    };
+    
+    setup(props);
+
+    expect(screen.getByText(/Education Level/i)).toBeInTheDocument();
+  });
+
+  // Test case for showing dropdown on click
+  test('shows dropdown options on click', () => {
+    const props = {
+      data: {
+        logical_field_name: 'education_level',
+        rwb_label_name: 'Education Level',
+      },
+      handleCallback: jest.fn(),
+    };
+
+    setup(props);
+
+    const dropdownField = screen.getByRole('textbox');
+    fireEvent.click(dropdownField);
+
+    expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
+  });
+
+  // Test case for selecting an option
+  test('selects an option from dropdown', () => {
+    const props = {
+      data: {
+        logical_field_name: 'education_level',
+        rwb_label_name: 'Education Level',
+      },
+      handleCallback: jest.fn(),
+    };
+
+    const storeState = {
+      ...initialStoreState,
+      lov: {
+        lov: [
+          {
+            label: 'education_level',
+            value: [
+              { CODE_VALUE: '1', CODE_DESC: 'High School', checked: false },
+              { CODE_VALUE: '2', CODE_DESC: 'Bachelor\'s Degree', checked: false }
+            ]
+          }
+        ]
+      }
+    };
+
+    setup(props, storeState);
+
+    // Open dropdown
+    fireEvent.click(screen.getByRole('textbox'));
+
+    // Select an option
+    fireEvent.click(screen.getByLabelText(/High School/i));
+
+    // Check callback is called
+    expect(props.handleCallback).toHaveBeenCalledWith(props.data, '1');
+  });
+
+  // Test case for displaying error message
+  test('displays error message when required field is left empty', async () => {
+    const props = {
+      data: {
+        logical_field_name: 'education_level',
+        mandatory: "Yes",
+        rwb_label_name: 'Education Level',
+      },
+      handleCallback: jest.fn(),
+    };
+
+    setup(props);
+
+    const dropdownField = screen.getByRole('textbox');
+    fireEvent.click(dropdownField);
+    
+    // Simulate removing the selected value
+    fireEvent.click(screen.getByText(/remove button/i));
+
+    // Check for error display logic
+    expect(screen.getByText(/select error message/i)).toBeInTheDocument(); // Update the text per your error message
+  });
+});
