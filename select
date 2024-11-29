@@ -56,25 +56,7 @@ const SelectionBox = (props: KeyWithAnyModel) => {
       }
     );
     let preSelectedCode: string | null = null;
-    if (props.data.logical_field_name === "purpose_of_account_rwb") {
-      if (stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name] === null
-        || stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name] === undefined) {
-        preSelectedCode = "IP"
-        const lovDataValue = findCodeDesc(preSelectedCode)
-        if (lovDataValue)
-          addLovData(props.data.logical_field_name, lovDataValue.CODE_DESC, lovDataValue.CODE_VALUE)
-
-      }
-    }
-    if (props.data.logical_field_name === "rationale") {
-      if (stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name] === null
-        || stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name] === undefined) {
-        preSelectedCode = "01"
-        const lovDataValue = findCodeDesc(preSelectedCode)
-        if (lovDataValue)
-          addLovData(props.data.logical_field_name, lovDataValue.CODE_DESC, lovDataValue.CODE_VALUE)
-      }
-    }
+   
     /* pre populated fields in BD-4 screen end */
     if (currentFieldLovRes.length > 0) {
       let dropDownData = JSON.parse(
@@ -129,10 +111,8 @@ const SelectionBox = (props: KeyWithAnyModel) => {
   useEffect(()=>{
     if(selectedValue.length > 0 ){
         dispatch(ContinueBtnAction.getContinueEnableState(true));
-        
       } else{
         dispatch(ContinueBtnAction.getContinueEnableState(false));
-
       }
        // eslint-disable-next-line react-hooks/exhaustive-deps  
   },[selectedValue.length > 0])
