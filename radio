@@ -37,9 +37,12 @@ export const RadioWithLabel = (props: KeyWithAnyModel) => {
   const dynamicFieldSelector = useSelector((state: StoreModel) => state.stages.dynamicFields)
   const parentChildToggleSelector = useSelector((state: StoreModel) => state.stages.parentChildFields)
   const userInputSelector = useSelector((state: StoreModel) => state.stages.userInput);
+
+
   const closePopup = () => {
     setShowPopup(false);
   }
+
   const fieldErrorSelector = useSelector(
     (state: StoreModel) => state.fielderror.error
   );
@@ -51,7 +54,20 @@ export const RadioWithLabel = (props: KeyWithAnyModel) => {
   const dispatch = useDispatch();
   const userAge = useSelector((state: UserAgeModel) => state.userAge);
   const investmentToggleSelector = useSelector((state: StoreModel) => state.stages.investmentToggle)
-  
+  const radioGroup =
+    [
+      CONSTANTS.LOGICAL_FIELD_NAMES.ID_TYPE_CB,
+      CONSTANTS.LOGICAL_FIELD_NAMES.CASA_FACTA_DECLARATION + "_1",
+      CONSTANTS.LOGICAL_FIELD_NAMES.CASA_FACTA_DECLARATION + "_2",
+      CONSTANTS.LOGICAL_FIELD_NAMES.CASA_FACTA_DECLARATION + "_3",
+      CONSTANTS.LOGICAL_FIELD_NAMES.CASH_NEEDS,
+      CONSTANTS.LOGICAL_FIELD_NAMES.DECISION,
+      CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE,
+      CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE,
+      CONSTANTS.LOGICAL_FIELD_NAMES.ESTATEMENT,
+      CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2,
+      CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3
+    ]
   useEffect(() => {
     if (stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.AD_2 && (stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name] === null
       || stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name] === undefined)) {
@@ -59,6 +75,149 @@ export const RadioWithLabel = (props: KeyWithAnyModel) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fieldErrorSelector]);
+
+  useEffect(() => {
+    if (
+      stageSelector &&
+      stageSelector[0] &&
+      stageSelector[0].stageInfo &&
+      stageSelector[0].stageInfo.applicants[0]
+    ) {
+
+      const userInputResponse =
+        inputSelector.applicants[0][props.data.logical_field_name];
+
+      const fieldValue =
+        userInputResponse ||
+        stageSelector[0].stageInfo.applicants[0][
+        props.data.logical_field_name
+        ];
+      if (
+        props.data.logical_field_name === "casa_fatca_declaration_1" ||
+        props.data.logical_field_name === "casa_fatca_declaration_2" ||
+        props.data.logical_field_name === "casa_fatca_declaration_3" ||
+        props.data.logical_field_name === "investment_experience" ||
+        props.data.logical_field_name === "supplementary_invest_experience"
+      ) {
+        if (fieldValue) {
+          setRadioDependency({
+            logical_field_name: props.data.logical_field_name,
+            value: fieldValue,
+          });
+        }
+      } else {
+        setselectedLov(fieldValue);
+      }
+      //Pre-populated estatement field in ad-2 screen
+      if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_2) {
+        setRadioDependency({
+          logical_field_name: props.data.logical_field_name,
+          value: stageSelector[0].stageInfo.applicants[0][
+            props.data.logical_field_name
+          ] ? stageSelector[0].stageInfo.applicants[0][
+          props.data.logical_field_name
+          ] : CONSTANTS.LOV_DATA.YES,
+        });
+        fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.ESTATEMENT, stageSelector[0].stageInfo.applicants[0][
+          props.data.logical_field_name
+        ] ? stageSelector[0].stageInfo.applicants[0][
+        props.data.logical_field_name
+        ] : CONSTANTS.LOV_DATA.YES)
+        dispatch(
+          lovDescAction.addLovData({
+            fieldData: {
+              fieldName: props.data.logical_field_name,
+              code_desc: stageSelector[0].stageInfo.applicants[0][
+                props.data.logical_field_name
+              ] ? stageSelector[0].stageInfo.applicants[0][
+                props.data.logical_field_name
+              ] === 'Y' ? language === CONSTANTS.LANG_EN ? CONSTANTS.YES : language === CONSTANTS.LANG_CN ? CONSTANTS.YES_CN : CONSTANTS.YES_HK : language === CONSTANTS.LANG_EN ? CONSTANTS.NO : language === CONSTANTS.LANG_CN ? CONSTANTS.NO_CN : CONSTANTS.NO_HK : language === CONSTANTS.LANG_EN ? CONSTANTS.YES : language === CONSTANTS.LANG_CN ? CONSTANTS.YES_CN : CONSTANTS.YES_HK,
+              code_value: stageSelector[0].stageInfo.applicants[0][
+                props.data.logical_field_name
+              ] ? stageSelector[0].stageInfo.applicants[0][
+              props.data.logical_field_name
+              ] : CONSTANTS.LOV_DATA.YES
+            }
+          })
+        );
+      }
+
+      //pre-populate element in address screen
+      if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5) {
+        setRadioDependency({
+          logical_field_name: props.data.logical_field_name,
+          value: stageSelector[0].stageInfo.applicants[0][
+            props.data.logical_field_name
+          ] ? stageSelector[0].stageInfo.applicants[0][
+          props.data.logical_field_name
+          ] : CONSTANTS.LOV_DATA.YES,
+        })
+        fieldUpdate(props.data.logical_field_name, stageSelector[0].stageInfo.applicants[0][
+          props.data.logical_field_name
+        ] ? stageSelector[0].stageInfo.applicants[0][
+        props.data.logical_field_name
+        ] : CONSTANTS.LOV_DATA.YES)
+        dispatch(
+          lovDescAction.addLovData({
+            fieldData: {
+              fieldName: props.data.logical_field_name,
+              code_desc: stageSelector[0].stageInfo.applicants[0][
+                props.data.logical_field_name
+              ] ? stageSelector[0].stageInfo.applicants[0][
+                props.data.logical_field_name
+              ] === 'Y' ? language === CONSTANTS.LANG_EN ? CONSTANTS.YES : language === CONSTANTS.LANG_CN ? CONSTANTS.YES_CN : CONSTANTS.YES_HK : language === CONSTANTS.LANG_EN ? CONSTANTS.NO : language === CONSTANTS.LANG_CN ? CONSTANTS.NO_CN : CONSTANTS.NO_HK : language === CONSTANTS.LANG_EN ? CONSTANTS.YES : language === CONSTANTS.LANG_CN ? CONSTANTS.YES_CN : CONSTANTS.YES_HK,
+              code_value: stageSelector[0].stageInfo.applicants[0][
+                props.data.logical_field_name
+              ] ? stageSelector[0].stageInfo.applicants[0][
+              props.data.logical_field_name
+              ] : CONSTANTS.LOV_DATA.YES
+            }
+          })
+        );
+
+      }
+
+
+       //pre-populate element in declaration screen
+       if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_6) {
+        setRadioDependency({
+          logical_field_name: props.data.logical_field_name,
+          value: stageSelector[0].stageInfo.applicants[0][
+            props.data.logical_field_name
+          ] ? stageSelector[0].stageInfo.applicants[0][
+          props.data.logical_field_name
+          ] : CONSTANTS.LOV_DATA.NO,
+        })
+        fieldUpdate(props.data.logical_field_name, stageSelector[0].stageInfo.applicants[0][
+          props.data.logical_field_name
+        ] ? stageSelector[0].stageInfo.applicants[0][
+        props.data.logical_field_name
+        ] : CONSTANTS.LOV_DATA.NO)
+        dispatch(
+          lovDescAction.addLovData({
+            fieldData: {
+              fieldName: props.data.logical_field_name,
+              code_desc: stageSelector[0].stageInfo.applicants[0][
+                props.data.logical_field_name
+              ] ? stageSelector[0].stageInfo.applicants[0][
+                props.data.logical_field_name
+              ] === 'Y' ? language === CONSTANTS.LANG_EN ? CONSTANTS.YES : language === CONSTANTS.LANG_CN ? CONSTANTS.YES_CN : CONSTANTS.YES_HK : language === CONSTANTS.LANG_EN ? CONSTANTS.NO : language === CONSTANTS.LANG_CN ? CONSTANTS.NO_CN : CONSTANTS.NO_HK : language === CONSTANTS.LANG_EN ? CONSTANTS.YES : language === CONSTANTS.LANG_CN ? CONSTANTS.YES_CN : CONSTANTS.YES_HK,
+              code_value: stageSelector[0].stageInfo.applicants[0][
+                props.data.logical_field_name
+              ] ? stageSelector[0].stageInfo.applicants[0][
+              props.data.logical_field_name
+              ] : CONSTANTS.LOV_DATA.NO
+            }
+          })
+        );
+
+      }
+
+
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_3) {
       if (props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE) {
@@ -113,9 +272,26 @@ export const RadioWithLabel = (props: KeyWithAnyModel) => {
     props.handleFieldDispatch(filedName, value, option);
     dispatch(isFieldUpdate(props, value, filedName));
   }
+
   const toggleInvestment = () => {
     dispatch(stagesAction.updateInvestmentToggle());
   }
+
+  const updateDynamicFields = () => {
+    if ((dynamicFieldSelector.investment_experience || stageSelector[0].stageInfo.applicants[0].investment_experience) !== '' && (dynamicFieldSelector.investment_experience || stageSelector[0].stageInfo.applicants[0].investment_experience) !== undefined) {
+      fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE, (dynamicFieldSelector.investment_experience || stageSelector[0].stageInfo.applicants[0].investment_experience))
+    }
+    if ((dynamicFieldSelector.financial_institution || stageSelector[0].stageInfo.applicants[0].financial_institution) !== '' && (dynamicFieldSelector.financial_institution || stageSelector[0].stageInfo.applicants[0].financial_institution) !== undefined) {
+      fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION, (dynamicFieldSelector.financial_institution || stageSelector[0].stageInfo.applicants[0].financial_institution))
+    }
+    if ((dynamicFieldSelector.financial_product || stageSelector[0].stageInfo.applicants[0].financial_product) !== '' && (dynamicFieldSelector.financial_product || stageSelector[0].stageInfo.applicants[0].financial_product) !== undefined) {
+      fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT, (dynamicFieldSelector.financial_product || stageSelector[0].stageInfo.applicants[0].financial_product))
+    }
+    if ((dynamicFieldSelector.financial_product2 || stageSelector[0].stageInfo.applicants[0].financial_product2) !== '' && (dynamicFieldSelector.financial_product2 || stageSelector[0].stageInfo.applicants[0].financial_product2) !== undefined) {
+      fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2, (dynamicFieldSelector.financial_product2 || stageSelector[0].stageInfo.applicants[0].financial_product2))
+    }
+  }
+
   useEffect(() => {
     if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_3) {
       if (props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE) {
@@ -171,12 +347,45 @@ export const RadioWithLabel = (props: KeyWithAnyModel) => {
       }
     }
 
-  
+    // if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5) {
+    //   const option = props.data.ui_defaulted_value === 'Y' ? "Yes" : "No";
+    //   fieldUpdate(props.data.logical_field_name, props.data.ui_defaulted_value, option)
+    // }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputSelector.applicants[0].cash_needs, inputSelector.applicants[0].decision, inputSelector.applicants[0].education_level, inputSelector.applicants[0].investment_experience])
 
   useEffect(() => {
-     if (lovSelector.lov.length > 0) {
+    if (radioDependency) {
+      const stageComponents = dispatch(
+        getFields(stageSelector, radioDependency, inputSelector, userAge, dynamicFieldSelector, parentChildToggleSelector)
+      );
+      // if (stageComponents && stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.BD_5) {
+      if (stageComponents && stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.AD_1 &&
+        stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.BD_3 &&
+        stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.SSF_1 &&
+        stageComponents && stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.BD_5) {
+        stageComponents.sort((prev: KeyWithAnyModel, next: KeyWithAnyModel) =>
+          prev.seq_no > next.seq_no ? -1 : 0
+        );
+      }
+      // }
+      setField(stageComponents);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [radioDependency, dispatch, investmentToggleSelector]);
+  useEffect(() => {
+    if (props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.ID_TYPE_CB) {
+      const returnValue = checkProductDetails(productSelector);
+      setIsShowOtherOption(returnValue ? true : false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isShowOtherOption])
+
+  useEffect(() => {
+    console.log(radioDependency)
+    console.log(props.data)
+    console.log(userInputSelector.applicants)
+    if (lovSelector.lov.length > 0) {
       lovSelector.lov.forEach((ref: LovInputModel) => {
         if (props.data.logical_field_name.includes(ref.label)) {
           if (ref.value && ref.value !== undefined) {
@@ -342,7 +551,17 @@ export const RadioWithLabel = (props: KeyWithAnyModel) => {
           {props.data.rwb_label_name} {language === CONSTANTS.LANG_EN ? errorMsg.required_mandatory : language === CONSTANTS.LANG_CN ? errorMsg.required_mandatory_CN : errorMsg.required_mandatory_HK}
         </div>
       )}
-     
+      {field && stageSelector[0].stageId !== "bd-5" &&
+        field.map((currentSection: KeyWithAnyModel, index: number) => {
+          return renderComponent(
+            currentSection,
+            index,
+            handleCallback,
+            handleFieldDispatch,
+            props.value
+          );
+        })
+      }
     </>
   );
 };
