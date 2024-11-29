@@ -1,0 +1,120 @@
+import React from "react";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { Provider } from "react-redux";
+import configureStore from "redux-mock-store";
+import { RadioWithLabel } from "./RadioWithLabel";
+import * as reactRedux from "react-redux";
+
+// Mock utility functions used in the component
+jest.mock("../../../utils/common/change.utils", () => ({
+  fieldError: jest.fn(),
+  isFieldUpdate: jest.fn(),
+}));
+jest.mock("../../../services/common-service", () => ({
+  checkProductDetails: jest.fn(),
+}));
+jest.mock("../../../utils/common/constants", () => ({
+  CONSTANTS: {
+    STAGE_NAMES: { BD_3: "bd-3", AD_2: "ad-2" },
+    LOGICAL_FIELD_NAMES: { SUPPLEMENTARY_INVEST_EXPERINECE: "supplementary_invest_experience" },
+    LOV_DATA: { YES: "Yes", NO: "No", ONE: "One" },
+    LANG_EN: "en",
+  },
+}));
+
+describe("RadioWithLabel Component", () => {
+  const mockStore = configureStore([]);
+  let store;
+  const mockDispatch = jest.fn();
+
+  const mockState = {
+    stages: {
+      stages: [
+        {
+          stageId: "bd-3",
+          stageInfo: {
+            applicants: [{ investment_experience: "Yes", decision: "No" }],
+          },
+        },
+      ],
+      dynamicFields: { investment_experience: "Yes", cash_needs: "Yes" },
+      userInput: { applicants: [{ cash_needs: "Yes", decision: "No" }] },
+      parentChildFields: {},
+      investmentToggle: false,
+    },
+    fielderror: { error: false },
+    userAge: { userAge: 40 },
+    lov: [
+      {
+        label: "investment_experience",
+        value: [
+          { CODE_VALUE: "Yes", CODE_DESC: "Yes Description" },
+          { CODE_VALUE: "No", CODE_DESC: "No Description" },
+        ],
+      },
+    ],
+    urlParam: { products: [] },
+  };
+
+  beforeEach(() => {
+    store = mockStore(mockState);
+    jest.spyOn(reactRedux, "useSelector").mockImplementation((callback) => callback(store.getState()));
+    jest.spyOn(reactRedux, "useDispatch").mockReturnValue(mockDispatch);
+  });
+
+  it("should render the component with the provided props", () => {
+    const handleCallbackMock = jest.fn();
+    const handleFieldDispatchMock = jest.fn();
+
+    render(
+      <Provider store={store}>
+        <RadioWithLabel
+          data={{
+            logical_field_name: "investment_experience",
+            rwb_label_name: "Investment Experience",
+            mandatory: "Yes",
+            editable: true,
+          }}
+          handleCallback={handleCallbackMock}
+          handleFieldDispatch={handleFieldDispatchMock}
+        />
+      </Provider>
+    );
+
+    // Verify the label and radio options are rendered
+    expect(screen.getByLabelText("Investment Experience")).toBeInTheDocument();
+    expect(screen.getByText("Yes Description")).toBeInTheDocument();
+    expect(screen.getByText("No Description")).toBeInTheDocument();
+  });
+
+  it("should handle radio button selection and dispatch the correct actions", () => {
+    const handleCallbackMock = jest.fn();
+    const handleFieldDispatchMock = jest.fn();
+
+    render(
+      <Provider store={store}>
+        <RadioWithLabel
+          data={{
+            logical_field_name: "investment_experience",
+            rwb_label_name: "Investment Experience",
+            mandatory: "Yes",
+            editable: true,
+          }}
+          handleCallback={handleCallbackMock}
+          handleFieldDispatch={handleFieldDispatchMock}
+        />
+      </Provider>
+    );
+
+    // Simulate clicking the "Yes" radio button
+    const yesRadio = screen.getByLabelText("Yes Description");
+    fireEvent.click(yesRadio);
+
+    // Verify that the callback and dispatch are called with the correct arguments
+    expect(handleCallbackMock).toHaveBeenCalledWith(
+      { logical_field_name: "investment_experience", rwb_label_name: "Investment Experience", mandatory: "Yes", editable: true },
+      "Yes"
+    );
+    expect(mockDispatch).toHaveBeenCalled();
+  });
+});
