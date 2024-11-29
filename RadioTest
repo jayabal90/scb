@@ -1,90 +1,87 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import { createStore } from 'redux';
-import { RadioWithLabel } from './RadioWithLabel';
-import rootReducer from '../../../utils/store'; // Adjust the path according to your store setup
+import configureStore from 'redux-mock-store';
+import RadioWithLabel from './RadioWithLabel'; // adjust the import according to your file structure
 import { CONSTANTS } from '../../../utils/common/constants';
 
-// Mock the Redux store
-const store = createStore(rootReducer, {
-  stages: {
-    stages: [{ stageId: CONSTANTS.STAGE_NAMES.BD_3, stageInfo: { applicants: [{}] } }],
-    dynamicFields: {},
-    parentChildFields: {},
-    userInput: {},
-    investmentToggle: false
+const mockStore = configureStore([]);
+
+// Sample props for the RadioWithLabel component
+const defaultProps = {
+  data: {
+    logical_field_name: 'test_field',
+    rwb_label_name: 'Test Label',
+    mandatory: 'Yes',
+    info_tooltips: 'Info Tooltip Content',
   },
-  lov: {
-    lov: [
-      { label: 'label1', value: [{ CODE_VALUE: '1', CODE_DESC: 'Option 1', checked: false }] },
-      { label: 'label2', value: [{ CODE_VALUE: '2', CODE_DESC: 'Option 2', checked: false }] },
-    ],
-  },
-  fielderror: {
-    error: {},
-  },
-  userAge: { userAge: 65 }
-});
+  handleCallback: jest.fn(),
+  handleFieldDispatch: jest.fn(),
+};
 
 describe('RadioWithLabel Component', () => {
-  it('should render radio buttons correctly', () => {
-    const mockHandleCallback = jest.fn();
-    const mockHandleFieldDispatch = jest.fn();
+  let store;
 
+  beforeEach(() => {
+    store = mockStore({
+      stages: {
+        stages: [{ stageId: 'bd-3', stageInfo: { applicants: [{}] } }],
+        dynamicFields: {},
+        userInput: { applicants: [{}] },
+      },
+      lov: { lov: [] },
+      fielderror: { error: {} },
+      urlParam: { products: [] },
+      userAge: { userAge: 50 },
+    });
+  });
+
+  test('renders the radio button and label', () => {
     render(
       <Provider store={store}>
-        <RadioWithLabel
-          data={{
-            logical_field_name: "test_field",
-            rwb_label_name: "Test Label",
-            info_tooltips: "This is an info tooltip",
-            mandatory: "Yes",
-            editable: true,
-            logical_field_name: "gender"
-          }}
-          handleCallback={mockHandleCallback}
-          handleFieldDispatch={mockHandleFieldDispatch}
-        />
+        <RadioWithLabel {...defaultProps} />
       </Provider>
     );
 
     // Check if the label is rendered
-    expect(screen.getByLabelText(/Test Label/i)).toBeInTheDocument();
+    expect(screen.getByText('Test Label')).toBeInTheDocument();
 
-    // Check if two radio buttons are rendered
-    const radioButtons = screen.getAllByRole('radio');
-    expect(radioButtons.length).toBe(2); // Expect two radio buttons from the mock data
-
-    // Simulate clicking on a radio button
-    fireEvent.click(radioButtons[0]);
-    
-    // Check if callback function was called
-    expect(mockHandleCallback).toHaveBeenCalled();
+    // Check if the radio button is present
+    const radio = screen.getByLabelText('Test Label');
+    expect(radio).toBeInTheDocument();
   });
 
-  it('should show error message when required', () => {
-    const mockHandleCallback = jest.fn();
-    const mockHandleFieldDispatch = jest.fn();
-
+  test('triggers the callback on radio button change', () => {
     render(
       <Provider store={store}>
-        <RadioWithLabel
-          data={{
-            logical_field_name: "test_field",
-            rwb_label_name: "Test Label",
-            info_tooltips: "This is an info tooltip",
-            mandatory: "Yes",
-            editable: true,
-            logical_field_name: "gender"
-          }}
-          handleCallback={mockHandleCallback}
-          handleFieldDispatch={mockHandleFieldDispatch}
-        />
+        <RadioWithLabel {...defaultProps} />
       </Provider>
     );
 
-    // Since we don't select any radio, it should display an error message
-    expect(screen.getByText(/Test Label required/i)).toBeInTheDocument();
+    const radio = screen.getByLabelText('Test Label');
+
+    // Simulate a change event
+    fireEvent.click(radio);
+
+    // Check if the callback function was called with correct arguments
+    expect(defaultProps.handleCallback).toHaveBeenCalledWith(defaultProps.data, expect.any(String));
+  });
+
+  test('displays error message when mandatory field is unchecked', () => {
+    render(
+      <Provider store={store}>
+        <RadioWithLabel {...defaultProps} />
+      </Provider>
+    );
+
+    // Check that the error message is not visible initially
+    expect(screen.queryByText(/required mandatory/i)).not.toBeInTheDocument();
+
+    // Simulating changes that would lead to an error
+    // This logic may vary based on your implementation
+    store.dispatch({ type: '@redux/UPDATE_FIELD_ERROR', payload: true }); // Simulating an error
+
+    // Check for the presence of the error message
+    expect(screen.getByText(/required mandatory/i)).toBeInTheDocument();
   });
 });
