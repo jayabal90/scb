@@ -1,0 +1,71 @@
+import { getFields } from './path/to/your/action'; // Update with the correct path to your action file
+import { CONSTANTS } from '../../../utils/common/constants'; 
+import { fieldErrorAction } from '../../../utils/store/field-error-slice';
+import { stagesAction } from '../../../utils/store/stages-slice';
+
+const mockDispatch = jest.fn();
+const mockGetLovData = jest.fn(); // Mock the getLovData function if used
+const mockFindIndex = jest.fn(); // Mock the FindIndex function if used
+const getLovData = jest.spyOn(require('../../../services/common-service'), 'getLovData').mockImplementation(mockGetLovData);
+const FindIndex = jest.spyOn(require('../../../utils/common/change.utils'), 'FindIndex').mockImplementation(mockFindIndex);
+
+describe('getFields action creator', () => {
+
+  beforeEach(() => {
+    jest.clearAllMocks(); // Clears mock calls and instances before each test
+  });
+
+  it('should dispatch the correct actions when radioResidency is provided', () => {
+    const userInputs = {
+      applicants: [{
+        [CONSTANTS.LOGICAL_FIELD_NAMES.NATURE_OF_EMPLOYER]: 'Some Employer'
+      }]
+    };
+
+    const getStages = [{
+      stageId: 'bd-3',
+      stageInfo: {
+        fieldMetaData: {
+          data: {
+            stages: [{
+              fields: [{ logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.NATURE_OF_EMPLOYER }]
+            }]
+          }
+        }
+      }
+    }];
+
+    const radioResidency = {
+      logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION,
+      value: '999'
+    };
+
+    const expectedActions = [
+      fieldErrorAction.removeMandatoryFields(expect.anything()), // Adjust according to your expectations
+      stagesAction.removeAddToggleField(expect.anything()),
+      stagesAction.modifyStage(expect.anything()),
+      fieldErrorAction.getMandatoryFields(expect.arrayContaining([CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION_1])),
+      stagesAction.updateParentChildToggle(expect.anything()),
+      stagesAction.updateNatureOfEmployeeField(expect.anything())
+    ];
+
+    const action = getFields(getStages, radioResidency, userInputs, {}, false);
+    action(mockDispatch);
+
+    expectedActions.forEach(action => {
+      expect(mockDispatch).toHaveBeenCalledWith(action);
+    });
+  });
+
+  it('should return null if no fields are found', () => {
+    const userInputs = {};
+    const getStages = [ { stageId: 'bd-3', stageInfo: {} } ];
+    const action = getFields(getStages, null, userInputs, {}, false);
+
+    const result = action(mockDispatch);
+
+    expect(result).toBe(null);
+  });
+
+  // More tests can be added to cover different scenarios and inputs
+});
