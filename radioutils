@@ -1,0 +1,377 @@
+import { AppDispatch, getLovData } from "../../../services/common-service";
+import { FindIndex } from "../../../utils/common/change.utils";
+import { CONSTANTS } from "../../../utils/common/constants";
+import { KeyWithAnyModel, RadioDependecyModel, StageDetails } from "../../../utils/model/common-model";
+import { fieldErrorAction } from "../../../utils/store/field-error-slice";
+import { stagesAction } from "../../../utils/store/stages-slice";
+
+
+export const getFields = (getStages: Array<StageDetails>, radioResidency: RadioDependecyModel | null, userInputs?: any, userAge?: any, dynamicFieldSelector?: any, parentChildToggleSelector?: any): any => {
+    return (dispatch: AppDispatch) => {
+        let fields: Array<KeyWithAnyModel> | undefined;
+        if (getStages && getStages[0].stageInfo && getStages[0].stageInfo.fieldMetaData && getStages[0].stageInfo.fieldMetaData.data.stages) {
+            const stageId = getStages[0].stageId;
+            const stageIndex = FindIndex(getStages[0].stageInfo, stageId);
+            fields = getStages[0].stageInfo.fieldMetaData.data.stages[stageIndex].fields;
+        }
+
+        let ssfStages: Array<string> | null = null;
+        let showFields: Array<string> = [];
+        let removeFields: Array<string> = [];
+        let stageValue = userInputs && userInputs.applicants[0];
+        // let stageValue = getStages && getStages[0].stageInfo && getStages[0].stageInfo.applicants[0];
+
+
+        const removeAddToggleFieldFn = (showFields: Array<string> | null, removeFields: Array<string> | null) => {
+            dispatch(fieldErrorAction.removeMandatoryFields(removeFields));
+            dispatch(
+                stagesAction.removeAddToggleField({
+                    removeFields: removeFields,
+                    newFields: showFields,
+                    value: ''
+                })
+            );
+        }
+        const updateDynamicFields = () => {
+            dispatch(stagesAction.updateDynamicFields({ 'label': CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE, 'value': '' }))
+            dispatch(stagesAction.updateDynamicFields({ 'label': CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE, 'value': '' }))
+            dispatch(stagesAction.updateDynamicFields({ 'label': CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION, 'value': '' }))
+            dispatch(stagesAction.updateDynamicFields({ 'label': CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT, 'value': '' }))
+            dispatch(stagesAction.updateDynamicFields({ 'label': CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2, 'value': '' }))
+        }
+
+        if (radioResidency) {
+            /* To display Exit Entry Permit, Passport & Expiry date field */
+            if (radioResidency.logical_field_name === 'id_type_cb') {
+                let hkYes: Array<string> = [];
+                let hkNo: Array<string> = [];
+                if (radioResidency.value === 'Exit-Entry Permit') {
+                    hkYes = ["EEP", "expiry_date"];
+                    hkNo = ["passport_no"]
+                } else if (radioResidency.value === 'Passport') {
+                    hkYes = ["passport_no", "expiry_date"]
+                    hkNo = ["EEP"]
+                }
+                ssfStages = hkYes
+                removeAddToggleFieldFn(hkYes, hkNo)
+
+                /** Eligibility Assesment Screen Condition */
+            } else if (radioResidency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.DECISION && (dynamicFieldSelector.cash_needs || getStages[0].stageInfo.applicants[0].cash_needs) && (dynamicFieldSelector.casa_fatca_declaration_1 || getStages[0].stageInfo.applicants[0].casa_fatca_declaration_1) && (dynamicFieldSelector.casa_fatca_declaration_2 || getStages[0].stageInfo.applicants[0].casa_fatca_declaration_2) && (dynamicFieldSelector.casa_fatca_declaration_3 || getStages[0].stageInfo.applicants[0].casa_fatca_declaration_3)) {
+                let showFields: Array<string> = [];
+                let removeFields: Array<string> = [];
+                const fieldsGroup: Array<string> | null = [
+                    CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE,
+                    CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION,
+                    CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT,
+                    CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2
+                ]
+
+                const fieldsGroup2: Array<string> | null = [...fieldsGroup, CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE]
+
+                const INVESTMENT_EXPERIENCE: Array<string> | null = [CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE]
+
+                if((dynamicFieldSelector.casa_fatca_declaration_1 || getStages[0].stageInfo.applicants[0].casa_fatca_declaration_1) === CONSTANTS.LOV_DATA.YES || (dynamicFieldSelector.casa_fatca_declaration_2 || getStages[0].stageInfo.applicants[0].casa_fatca_declaration_2) === CONSTANTS.LOV_DATA.YES || (dynamicFieldSelector.casa_fatca_declaration_3 || getStages[0].stageInfo.applicants[0].casa_fatca_declaration_3) === CONSTANTS.LOV_DATA.YES) {
+                    console.log('Scenario casa fatca yes')
+                    showFields = [];
+                    removeFields = fieldsGroup2
+                    updateDynamicFields()
+                } else if (
+                    (dynamicFieldSelector.decision || getStages[0].stageInfo.applicants[0].decision) === CONSTANTS.LOV_DATA.YES &&
+                    userAge.userAge <= CONSTANTS.AGE.AGE_74 &&
+                    (dynamicFieldSelector.education_level || getStages[0].stageInfo.applicants[0].education_level) !== ''
+                ) {
+                    console.log('Scenario #12 / 13 / 14 / 15')
+                    showFields = [];
+                    removeFields = fieldsGroup2
+                    updateDynamicFields()
+                } else if (
+                    (dynamicFieldSelector.cash_needs || getStages[0].stageInfo.applicants[0].cash_needs) === CONSTANTS.LOV_DATA.YES &&
+                    (dynamicFieldSelector.decision || getStages[0].stageInfo.applicants[0].decision) === CONSTANTS.LOV_DATA.NO &&
+                    userAge.userAge <= CONSTANTS.AGE.AGE_74 &&
+                    (dynamicFieldSelector.education_level || getStages[0].stageInfo.applicants[0].education_level)
+                ) {
+                    console.log('Scenario #6 / 17 / 8 / 19 / 5 / 16 / 7 / 18')
+                    showFields = INVESTMENT_EXPERIENCE;
+                    removeFields = fieldsGroup
+                    dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE))
+                } else if (
+                    (dynamicFieldSelector.cash_needs || getStages[0].stageInfo.applicants[0].cash_needs) === CONSTANTS.LOV_DATA.NO &&
+                    (dynamicFieldSelector.decision || getStages[0].stageInfo.applicants[0].decision) === CONSTANTS.LOV_DATA.NO &&
+                    userAge.userAge < CONSTANTS.AGE.AGE_65 &&
+                    (dynamicFieldSelector.education_level || getStages[0].stageInfo.applicants[0].education_level) &&
+                    (dynamicFieldSelector.education_level || getStages[0].stageInfo.applicants[0].education_level) !== CONSTANTS.LOV_DATA.EDUCATION_LEVEL.PRIMARY
+                ) {
+                    console.log('Scenario #11')
+                    showFields = [];
+                    removeFields = fieldsGroup2;
+                    updateDynamicFields()
+                } else if (
+                    (dynamicFieldSelector.cash_needs || getStages[0].stageInfo.applicants[0].cash_needs) === CONSTANTS.LOV_DATA.NO &&
+                    (dynamicFieldSelector.decision || getStages[0].stageInfo.applicants[0].decision) === CONSTANTS.LOV_DATA.NO &&
+                    (
+                        userAge.userAge >= CONSTANTS.AGE.AGE_65 &&
+                        userAge.userAge <= CONSTANTS.AGE.AGE_74
+                    ) &&
+                    (dynamicFieldSelector.education_level || getStages[0].stageInfo.applicants[0].education_level)
+                ) {
+                    console.log('Scenario #21 / 23 / 9 / 20')
+                    showFields = INVESTMENT_EXPERIENCE;
+                    removeFields = fieldsGroup;
+                    dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE))
+                } else if (
+                    (dynamicFieldSelector.cash_needs || getStages[0].stageInfo.applicants[0].cash_needs) === CONSTANTS.LOV_DATA.NO &&
+                    (dynamicFieldSelector.decision || getStages[0].stageInfo.applicants[0].decision) === CONSTANTS.LOV_DATA.NO &&
+                    userAge.userAge < CONSTANTS.AGE.AGE_65 &&
+                    (dynamicFieldSelector.education_level || getStages[0].stageInfo.applicants[0].education_level) === CONSTANTS.LOV_DATA.EDUCATION_LEVEL.PRIMARY
+                ) {
+                    console.log('Scenario #10')
+                    showFields = INVESTMENT_EXPERIENCE;
+                    removeFields = fieldsGroup;
+                    dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE))
+                }
+                else {
+                    console.log('else')
+                    showFields = [];
+                    removeFields = fieldsGroup2;
+                    updateDynamicFields()
+                }
+
+                ssfStages = showFields
+                // dispatch(fieldErrorAction.removeMandatoryFields(removeFields));
+                removeAddToggleFieldFn(showFields, removeFields)
+                //During the onchange of education_level these values should not get empty ''
+                dispatch(stagesAction.modifyStage({fieldData: { fieldName: CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE,
+                    value: stageValue[CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE],} 
+                 }));
+                 //During the onchange of education_level these values should not get empty ''
+                dispatch(stagesAction.modifyStage({fieldData: { fieldName: CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION,
+                    value: stageValue[CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION],} 
+                 }));
+                dispatch(stagesAction.modifyStage({fieldData: { fieldName: CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT,
+                    value: stageValue[CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT],}
+                }));
+                dispatch(stagesAction.modifyStage({fieldData: { fieldName: CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE,
+                    value: stageValue[CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE],}
+                }));
+            }
+            else if (radioResidency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE && (dynamicFieldSelector.investment_experience || getStages[0].stageInfo.applicants[0].investment_experience)) {
+                let showFields: Array<string> = [];
+                let removeFields: Array<string> = [];
+                const SUPPLEMENTARY_INVEST_EXPERINECE = [CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE]
+
+                if(userInputs.applicants[0].investment_experience) {
+                    if (userInputs.applicants[0].investment_experience === CONSTANTS.LOV_DATA.YES) {
+                        showFields = SUPPLEMENTARY_INVEST_EXPERINECE;
+                        removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2];
+                        dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE))
+                    } else {
+                        showFields = [];
+                        removeFields = [...SUPPLEMENTARY_INVEST_EXPERINECE, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2];
+                    }
+                } else if (getStages[0].stageInfo.applicants[0].investment_experience) {
+                    if (getStages[0].stageInfo.applicants[0].investment_experience === CONSTANTS.LOV_DATA.YES) {
+                        showFields = SUPPLEMENTARY_INVEST_EXPERINECE;
+                        removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2];
+                        dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE))
+                    } else {
+                        showFields = [];
+                        removeFields = [...SUPPLEMENTARY_INVEST_EXPERINECE, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2];
+                    }
+                } else {
+                    showFields = [];
+                    removeFields = [...SUPPLEMENTARY_INVEST_EXPERINECE, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2];
+                }
+                ssfStages = showFields
+                // dispatch(fieldErrorAction.removeMandatoryFields(removeFields));
+                removeAddToggleFieldFn(showFields, removeFields)
+                //During the onchange of education_level these values should not get empty ''
+                dispatch(stagesAction.modifyStage({fieldData: { fieldName: CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION,
+                    value: stageValue[CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION],} 
+                 }));
+                dispatch(stagesAction.modifyStage({fieldData: { fieldName: CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT,
+                    value: stageValue[CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT],}
+                }));
+                dispatch(stagesAction.modifyStage({fieldData: { fieldName: CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE,
+                    value: stageValue[CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE],}
+                }));
+            }
+            else if (radioResidency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE && (dynamicFieldSelector.supplementary_invest_experience || getStages[0].stageInfo.applicants[0].supplementary_invest_experience)) {
+                let showFields: Array<string> = [];
+                let removeFields: Array<string> = [];
+                if(userInputs.applicants[0].supplementary_invest_experience) {
+                    if (userInputs.applicants[0].supplementary_invest_experience === CONSTANTS.LOV_DATA.ONE) {
+                        showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT];
+                        removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2];
+                        dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION))
+                        dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT))
+                    } else {
+                        showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2];
+                        removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT];
+                        dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION))
+                        dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2))
+                    }
+                } else if (getStages[0].stageInfo.applicants[0].supplementary_invest_experience) {
+                    if (getStages[0].stageInfo.applicants[0].supplementary_invest_experience === CONSTANTS.LOV_DATA.ONE) {
+                        showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT];
+                        removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2];
+                        dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION))
+                        dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT))
+                        dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE))
+                    } else {
+                            showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2];
+                            removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT];
+                            dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION))
+                            dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2))
+                    }
+                } else {
+                    showFields = [];
+                    removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT, CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2];
+                }
+                ssfStages = showFields
+                // dispatch(fieldErrorAction.removeMandatoryFields(removeFields));
+                removeAddToggleFieldFn(showFields, removeFields)
+                //During the onchange of education_level these values should not get empty ''
+                dispatch(stagesAction.modifyStage({fieldData: { fieldName: CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION,
+                        value: stageValue[CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION],} 
+                     }));
+                dispatch(stagesAction.modifyStage({fieldData: { fieldName: CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT,
+                        value: stageValue[CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT],}
+                    }));
+                dispatch(stagesAction.modifyStage({fieldData: { fieldName: CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE,
+                        value: stageValue[CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE],}
+                    }));
+            }
+            /* Address page logic for selecting residence radio button */
+            else if (radioResidency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2 || radioResidency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3) {
+                // if (radioResidency.value === CONSTANTS.LOV_DATA.YES ) {
+                // dispatch(stagesAction.removeAddToggleField({
+                //         removeFields: [ CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2, CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3,CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING,  CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2],
+                //         newFields: [],
+                //         value: '' 
+                //     })
+                //         );
+                // }
+                if (radioResidency.value === CONSTANTS.LOV_DATA.NO ) {
+                    if(userInputs.applicants[0].res_country_1 && userInputs.applicants[0].res_country_1 === CONSTANTS.LOV_DATA.CHINESE_MAINLAND) {
+                        if(userInputs.applicants[0].res_district_3) {
+                            if(userInputs.applicants[0].res_country_2 && userInputs.applicants[0].res_country_2 === CONSTANTS.LOV_DATA.CHINESE_MAINLAND) {
+                                if(userInputs.applicants[0].RES_DISTRICT_4) {
+                                    showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_1, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_RES ,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_2, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_1, CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2]
+                                } else {
+                                    showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_1, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_RES ,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_2, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_1, CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2]
+                                }
+                                removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING]
+                            } else if(userInputs.applicants[0].res_country_2 && userInputs.applicants[0].res_country_2 !== CONSTANTS.LOV_DATA.CHINESE_MAINLAND && userInputs.applicants[0].res_country_2 !== CONSTANTS.LOV_DATA.HONG_KONG) {
+                                showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_1, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_RES ,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_2, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_1, CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2,CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING]
+                                removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4,CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2];
+                            } else if(userInputs.applicants[0].res_country_2 && userInputs.applicants[0].res_country_2 !== CONSTANTS.LOV_DATA.CHINESE_MAINLAND && userInputs.applicants[0].res_country_2 === CONSTANTS.LOV_DATA.HONG_KONG) {
+                                showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_1, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_RES ,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_2, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_1, CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2,CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3]
+                                removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4,CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING];
+                            } else {
+                                showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_1, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_RES ,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_2, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_1, CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2]
+                                removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING]
+                            }
+                        } else {
+                            if(userInputs.applicants[0].res_country_2 && userInputs.applicants[0].res_country_2 === CONSTANTS.LOV_DATA.CHINESE_MAINLAND) {
+                                if(userInputs.applicants[0].RES_DISTRICT_4) {
+                                    showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_1, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_RES ,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_2, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_1, CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2]
+                                } else {
+                                    showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_1, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_RES ,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_2, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_1, CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2]
+                                }
+                                removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING]
+                            } else if(userInputs.applicants[0].res_country_2 && userInputs.applicants[0].res_country_2 !== CONSTANTS.LOV_DATA.CHINESE_MAINLAND && userInputs.applicants[0].res_country_2 !== CONSTANTS.LOV_DATA.HONG_KONG) {
+                                showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_1, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_RES ,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_2, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_1, CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2,CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING]
+                                removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4,CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2];
+                            } else if(userInputs.applicants[0].res_country_2 && userInputs.applicants[0].res_country_2 !== CONSTANTS.LOV_DATA.CHINESE_MAINLAND && userInputs.applicants[0].res_country_2 === CONSTANTS.LOV_DATA.HONG_KONG) {
+                                showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_1, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_RES ,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_2, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_1, CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2,CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3]
+                                removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4,CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING];
+                            } else {
+                                showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_1, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_RES ,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_2, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_1, CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2]
+                                removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING]
+                            }
+                        }
+                    } else if(userInputs.applicants && userInputs.applicants[0] && userInputs.applicants[0].res_country_1 && userInputs.applicants[0].res_country_1 !== CONSTANTS.LOV_DATA.CHINESE_MAINLAND && userInputs.applicants[0].res_country_1 !== CONSTANTS.LOV_DATA.HONG_KONG) {
+                        if(userInputs.applicants[0].res_country_2 && userInputs.applicants[0].res_country_2 === CONSTANTS.LOV_DATA.CHINESE_MAINLAND) {
+                            if(userInputs.applicants[0].RES_DISTRICT_4) {
+                                showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1,CONSTANTS.LOGICAL_FIELD_NAMES.STATE_RES_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_2,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_3,CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_RES,CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2]
+                            } else {
+                                showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1, CONSTANTS.LOGICAL_FIELD_NAMES.STATE_RES_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_2,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_3,CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_RES,CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2]
+                            }
+                            removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING]
+                        } else if(userInputs.applicants[0].res_country_2 && userInputs.applicants[0].res_country_2 !== CONSTANTS.LOV_DATA.CHINESE_MAINLAND && userInputs.applicants[0].res_country_2 !== CONSTANTS.LOV_DATA.HONG_KONG) {
+                            showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1, CONSTANTS.LOGICAL_FIELD_NAMES.STATE_RES_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_2,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_3,CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_RES,CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2,CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING]
+                            removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4,CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2];
+                        } else if(userInputs.applicants[0].res_country_2 && userInputs.applicants[0].res_country_2 !== CONSTANTS.LOV_DATA.CHINESE_MAINLAND && userInputs.applicants[0].res_country_2 === CONSTANTS.LOV_DATA.HONG_KONG) {
+                            showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1, CONSTANTS.LOGICAL_FIELD_NAMES.STATE_RES_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_2,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_3,CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_RES,CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2,CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3]
+                            removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4,CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING];
+                        } else {
+                            showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1, CONSTANTS.LOGICAL_FIELD_NAMES.STATE_RES_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_2,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_3,CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_RES,CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2]
+                            removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING]
+                        }
+                    } else if(userInputs.applicants[0].res_country_1 && userInputs.applicants[0].res_country_1 !== CONSTANTS.LOV_DATA.CHINESE_MAINLAND && userInputs.applicants[0].res_country_1 === CONSTANTS.LOV_DATA.HONG_KONG) {
+                        if(userInputs.applicants[0].res_country_2 && userInputs.applicants[0].res_country_2 === CONSTANTS.LOV_DATA.CHINESE_MAINLAND) {
+                            if(userInputs.applicants[0].RES_DISTRICT_4) {
+                                showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1,CONSTANTS.LOGICAL_FIELD_NAMES.STATE_RES_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_2,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_3,CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2]
+                            } else {
+                                showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1, CONSTANTS.LOGICAL_FIELD_NAMES.STATE_RES_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_2,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_3,CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2]
+                            }
+                            removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING]
+                        } else if(userInputs.applicants[0].res_country_2 && userInputs.applicants[0].res_country_2 !== CONSTANTS.LOV_DATA.CHINESE_MAINLAND && userInputs.applicants[0].res_country_2 !== CONSTANTS.LOV_DATA.HONG_KONG) {
+                            showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1, CONSTANTS.LOGICAL_FIELD_NAMES.STATE_RES_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_2,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_3,CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2,CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING]
+                            removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4,CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2];
+                        } else if(userInputs.applicants[0].res_country_2 && userInputs.applicants[0].res_country_2 !== CONSTANTS.LOV_DATA.CHINESE_MAINLAND && userInputs.applicants[0].res_country_2 === CONSTANTS.LOV_DATA.HONG_KONG) {
+                            showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1, CONSTANTS.LOGICAL_FIELD_NAMES.STATE_RES_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_2,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_3,CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2,CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3]
+                            removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4,CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING];
+                        } else {
+                            showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1, CONSTANTS.LOGICAL_FIELD_NAMES.STATE_RES_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_1,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_2,CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_3,CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2]
+                            removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING]
+                        }
+                    } else {
+                        showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_2, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_1, CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2,CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2]
+                        removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING]
+                    }
+                    dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2))
+                } else if (radioResidency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2 && radioResidency.value === CONSTANTS.LOV_DATA.YES && userInputs.applicants[0].res_country_1) {
+                    if (radioResidency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2 && radioResidency.value === CONSTANTS.LOV_DATA.YES && userInputs.applicants[0].res_district_3) {
+                        showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1,CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_1, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_1, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_1, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_RES, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_2, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_1, CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2];
+
+                        removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2, CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING]
+                    } else if (radioResidency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2 && radioResidency.value === CONSTANTS.LOV_DATA.YES && !(userInputs.applicants[0].res_district_3)) {
+                        showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_1, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_1, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_1, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_RES, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_2, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_1, CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2];
+
+                        removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2, CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING]
+                    }
+                } else if(radioResidency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2 && radioResidency.value === CONSTANTS.LOV_DATA.YES && !(userInputs.applicants[0].res_country_1)) {
+                    showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_1, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_1, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_1, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_2, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_1, CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2];
+
+                    removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_3,CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_RES,CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2, CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING]
+                } else {
+                    if(radioResidency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3 && radioResidency.value === CONSTANTS.LOV_DATA.YES && userInputs.applicants[0].res_country_1 === CONSTANTS.LOV_DATA.HONG_KONG) {
+                        showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1, CONSTANTS.LOGICAL_FIELD_NAMES.STATE_RES_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_RES_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_3, CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3];
+                        removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2, CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_RES]
+                    } else if(radioResidency.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3 && radioResidency.value === CONSTANTS.LOV_DATA.YES && userInputs.applicants[0].res_country_1 !== CONSTANTS.LOV_DATA.HONG_KONG) {
+                        showFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1, CONSTANTS.LOGICAL_FIELD_NAMES.STATE_RES_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_RES_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_RES_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_RES, CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3];
+                        removeFields = [CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2, CONSTANTS.LOGICAL_FIELD_NAMES.RES_DISTRICT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_3, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINYIN_MAILING, CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4, CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4, CONSTANTS.LOGICAL_FIELD_NAMES.POSTAL_CODE_2, CONSTANTS.LOGICAL_FIELD_NAMES.STATE_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.CITY_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_1, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_2, CONSTANTS.LOGICAL_FIELD_NAMES.ADDRESS_MAILING_3, CONSTANTS.LOGICAL_FIELD_NAMES.PINCODE_MAILING]
+                    }
+                }
+                ssfStages = showFields
+            }
+        }
+        if (ssfStages && fields) {
+            dispatch(fieldErrorAction.getMandatoryFields(ssfStages));
+            const stageComponents = fields.filter((field: KeyWithAnyModel) =>
+                ssfStages!.includes(field.logical_field_name)
+            );
+            if (getStages[0].stageId === 'bd-5') {
+                dispatch(stagesAction.updateParentChildToggle({
+                    deleteSelectFields: removeFields,
+                    addSelectFields: Array.from(new Set((parentChildToggleSelector.resFields).concat(showFields))),
+                    resFields: parentChildToggleSelector.resFields,
+                    selectFields: stageComponents,
+                }))
+            }
+            return stageComponents;
+        }
+        return null;
+    }
+}
