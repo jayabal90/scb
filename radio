@@ -199,45 +199,12 @@ export const RadioWithLabel = (props: KeyWithAnyModel) => {
       }
     }
 
-    // if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5) {
-    //   const option = props.data.ui_defaulted_value === 'Y' ? "Yes" : "No";
-    //   fieldUpdate(props.data.logical_field_name, props.data.ui_defaulted_value, option)
-    // }
+  
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputSelector.applicants[0].cash_needs, inputSelector.applicants[0].decision, inputSelector.applicants[0].education_level, inputSelector.applicants[0].investment_experience])
 
   useEffect(() => {
-    if (radioDependency) {
-      const stageComponents = dispatch(
-        getFields(stageSelector, radioDependency, inputSelector, userAge, dynamicFieldSelector, parentChildToggleSelector)
-      );
-      // if (stageComponents && stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.BD_5) {
-      if (stageComponents && stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.AD_1 &&
-        stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.BD_3 &&
-        stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.SSF_1 &&
-        stageComponents && stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.BD_5) {
-        stageComponents.sort((prev: KeyWithAnyModel, next: KeyWithAnyModel) =>
-          prev.seq_no > next.seq_no ? -1 : 0
-        );
-      }
-      // }
-      setField(stageComponents);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [radioDependency, dispatch, investmentToggleSelector]);
-  useEffect(() => {
-    if (props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.ID_TYPE_CB) {
-      const returnValue = checkProductDetails(productSelector);
-      setIsShowOtherOption(returnValue ? true : false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isShowOtherOption])
-
-  useEffect(() => {
-    console.log(radioDependency)
-    console.log(props.data)
-    console.log(userInputSelector.applicants)
-    if (lovSelector.lov.length > 0) {
+     if (lovSelector.lov.length > 0) {
       lovSelector.lov.forEach((ref: LovInputModel) => {
         if (props.data.logical_field_name.includes(ref.label)) {
           if (ref.value && ref.value !== undefined) {
@@ -403,17 +370,7 @@ export const RadioWithLabel = (props: KeyWithAnyModel) => {
           {props.data.rwb_label_name} {language === CONSTANTS.LANG_EN ? errorMsg.required_mandatory : language === CONSTANTS.LANG_CN ? errorMsg.required_mandatory_CN : errorMsg.required_mandatory_HK}
         </div>
       )}
-      {field && stageSelector[0].stageId !== "bd-5" &&
-        field.map((currentSection: KeyWithAnyModel, index: number) => {
-          return renderComponent(
-            currentSection,
-            index,
-            handleCallback,
-            handleFieldDispatch,
-            props.value
-          );
-        })
-      }
+     
     </>
   );
 };
