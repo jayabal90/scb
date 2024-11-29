@@ -51,20 +51,7 @@ export const RadioWithLabel = (props: KeyWithAnyModel) => {
   const dispatch = useDispatch();
   const userAge = useSelector((state: UserAgeModel) => state.userAge);
   const investmentToggleSelector = useSelector((state: StoreModel) => state.stages.investmentToggle)
-  const radioGroup =
-    [
-      CONSTANTS.LOGICAL_FIELD_NAMES.ID_TYPE_CB,
-      CONSTANTS.LOGICAL_FIELD_NAMES.CASA_FACTA_DECLARATION + "_1",
-      CONSTANTS.LOGICAL_FIELD_NAMES.CASA_FACTA_DECLARATION + "_2",
-      CONSTANTS.LOGICAL_FIELD_NAMES.CASA_FACTA_DECLARATION + "_3",
-      CONSTANTS.LOGICAL_FIELD_NAMES.CASH_NEEDS,
-      CONSTANTS.LOGICAL_FIELD_NAMES.DECISION,
-      CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE,
-      CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE,
-      CONSTANTS.LOGICAL_FIELD_NAMES.ESTATEMENT,
-      CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2,
-      CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_3
-    ]
+  
   useEffect(() => {
     if (stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.AD_2 && (stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name] === null
       || stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name] === undefined)) {
@@ -129,21 +116,6 @@ export const RadioWithLabel = (props: KeyWithAnyModel) => {
   const toggleInvestment = () => {
     dispatch(stagesAction.updateInvestmentToggle());
   }
-  const updateDynamicFields = () => {
-    if ((dynamicFieldSelector.investment_experience || stageSelector[0].stageInfo.applicants[0].investment_experience) !== '' && (dynamicFieldSelector.investment_experience || stageSelector[0].stageInfo.applicants[0].investment_experience) !== undefined) {
-      fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE, (dynamicFieldSelector.investment_experience || stageSelector[0].stageInfo.applicants[0].investment_experience))
-    }
-    if ((dynamicFieldSelector.financial_institution || stageSelector[0].stageInfo.applicants[0].financial_institution) !== '' && (dynamicFieldSelector.financial_institution || stageSelector[0].stageInfo.applicants[0].financial_institution) !== undefined) {
-      fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION, (dynamicFieldSelector.financial_institution || stageSelector[0].stageInfo.applicants[0].financial_institution))
-    }
-    if ((dynamicFieldSelector.financial_product || stageSelector[0].stageInfo.applicants[0].financial_product) !== '' && (dynamicFieldSelector.financial_product || stageSelector[0].stageInfo.applicants[0].financial_product) !== undefined) {
-      fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT, (dynamicFieldSelector.financial_product || stageSelector[0].stageInfo.applicants[0].financial_product))
-    }
-    if ((dynamicFieldSelector.financial_product2 || stageSelector[0].stageInfo.applicants[0].financial_product2) !== '' && (dynamicFieldSelector.financial_product2 || stageSelector[0].stageInfo.applicants[0].financial_product2) !== undefined) {
-      fieldUpdate(CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2, (dynamicFieldSelector.financial_product2 || stageSelector[0].stageInfo.applicants[0].financial_product2))
-    }
-  }
-
   useEffect(() => {
     if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_3) {
       if (props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE) {
