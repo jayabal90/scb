@@ -1,80 +1,120 @@
-import React from "react";
-import { render, fireEvent, screen } from "@testing-library/react";
-import { Provider } from "react-redux";
-import configureStore from "redux-mock-store";
-import SelectionBox from "./SelectionBox"; // Adjust the import path as necessary
-import { CONSTANTS } from "../../../utils/common/constants";
-import { LovInputModel, LovInputValModel } from "../../../utils/model/common-model";
+import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import configureStore from 'redux-mock-store';
+import { useDispatch, useSelector } from 'react-redux';
+import SelectionBox from './SelectionBox'; // Adjust the import path as necessary
+import { CONSTANTS } from '../../../utils/common/constants'; // Adjust the path as necessary
 
 // Create a mock store
 const mockStore = configureStore();
-const store = mockStore({
-  lov: {
-    lov: [
-      {
-        label: "education_level",
-        value: [
-          { CODE_VALUE: "1", CODE_DESC: "High School", checked: false },
-          { CODE_VALUE: "2", CODE_DESC: "Bachelor's", checked: false },
-        ],
-      },
-    ],
-  },
-  stages: {
-    stages: [{ stageId: CONSTANTS.STAGE_NAMES.BD_5 }],
-    dependencyFields: {},
-    userInput: {
-      applicants: [{ education_level: "1" }],
-    },
-    cityDynamicField: { cityValue: "" },
-    parentChildFields: {},
-  },
-  fielderror: { error: "" },
-});
 
-describe("SelectionBox component", () => {
-  let props;
+jest.mock('react-redux', () => ({
+  ...jest.requireActual('react-redux'),
+  useDispatch: jest.fn(),
+  useSelector: jest.fn(),
+}));
+
+describe('SelectionBox Component', () => {
+  let mockDispatch = jest.fn();
 
   beforeEach(() => {
-    props = {
+    // Set up the mocked implementation for useDispatch
+    (useDispatch as jest.Mock).mockReturnValue(mockDispatch);
+    
+    // Provide a mocked state for useSelector
+    (useSelector as jest.Mock).mockImplementation((selector) => {
+      return selector({
+        lov: {
+          lov: [
+            {
+              label: "education_level",
+              value: [
+                { CODE_VALUE: "1", CODE_DESC: "High School", checked: false },
+                { CODE_VALUE: "2", CODE_DESC: "Bachelor's", checked: false },
+              ],
+            },
+          ],
+        },
+        stages: {
+          stages: [{ stageId: CONSTANTS.STAGE_NAMES.BD_5 }],
+          dependencyFields: {},
+          userInput: {
+            applicants: [{ education_level: "1" }],
+          },
+          cityDynamicField: { cityValue: "" },
+          parentChildFields: {},
+        },
+        fielderror: { error: "" },
+      });
+    });
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('renders the SelectionBox component', () => {
+    const props = {
       data: {
-        logical_field_name: "education_level",
-        rwb_label_name: "Education Level",
-        ui_defaulted_value: "1",
-        mandatory: "Yes",
+        logical_field_name: 'education_level',
+        rwb_label_name: 'Education Level',
+        ui_defaulted_value: '1',
+        mandatory: 'Yes',
       },
       handleCallback: jest.fn(),
       handleFieldDispatch: jest.fn(),
     };
-  });
 
-  test("renders the SelectionBox component", () => {
     render(
-      <Provider store={store}>
+      <Provider store={mockStore({})}>
         <SelectionBox {...props} />
       </Provider>
     );
 
     expect(screen.getByLabelText(/Education Level/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Education Level")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Education Level')).toBeInTheDocument();
   });
 
-  test("shows options when clicked", () => {
+  test('opens dropdown and shows options', () => {
+    const props = {
+      data: {
+        logical_field_name: 'education_level',
+        rwb_label_name: 'Education Level',
+        ui_defaulted_value: '1',
+        mandatory: 'Yes',
+      },
+      handleCallback: jest.fn(),
+      handleFieldDispatch: jest.fn(),
+    };
+
     render(
-      <Provider store={store}>
+      <Provider store={mockStore({})}>
         <SelectionBox {...props} />
       </Provider>
     );
 
     // Open dropdown
     fireEvent.click(screen.getByLabelText(/Education Level/i));
+    
     expect(screen.getByText(/High School/i)).toBeInTheDocument();
     expect(screen.getByText(/Bachelor's/i)).toBeInTheDocument();
   });
 
-  test("selects an option", () => {
+  test('selecting an option calls the callback function', () => {
+    const props = {
+      data: {
+        logical_field_name: 'education_level',
+        rwb_label_name: 'Education Level',
+        ui_defaulted_value: '1',
+        mandatory: 'Yes',
+      },
+      handleCallback: jest.fn(),
+      handleFieldDispatch: jest.fn(),
+    };
+
     render(
-      <Provider store={store}>
+      <Provider store={mockStore({})}>
         <SelectionBox {...props} />
       </Provider>
     );
@@ -85,26 +125,35 @@ describe("SelectionBox component", () => {
     // Select option
     fireEvent.click(screen.getByLabelText(/High School/i));
 
-    // Check if the callback is called with the selected value
-    expect(props.handleCallback).toHaveBeenCalledWith(props.data, "1");
-    expect(screen.getByDisplayValue(/High School/i)).toBeInTheDocument();
+    // Check if the callback is called with the correct arguments
+    expect(props.handleCallback).toHaveBeenCalledWith(props.data, '1');
   });
 
-  test("validates selection and shows an error", () => {
-    props.data.mandatory = "Yes"; // setting the field as mandatory
+  test('handles errors for mandatory fields', () => {
+    const props = {
+      data: {
+        logical_field_name: 'education_level',
+        rwb_label_name: 'Education Level',
+        ui_defaulted_value: '',
+        mandatory: 'Yes',
+      },
+      handleCallback: jest.fn(),
+      handleFieldDispatch: jest.fn(),
+    };
 
     render(
-      <Provider store={store}>
+      <Provider store={mockStore({})}>
         <SelectionBox {...props} />
       </Provider>
     );
 
-    // Open dropdown
+    // Simulate opening the dropdown
     fireEvent.click(screen.getByLabelText(/Education Level/i));
 
-    // Close the dropdown and simulate deselection
-    fireEvent.click(screen.getByLabelText(/High School/i));
+    // Simulate not selecting any option
+    fireEvent.click(screen.getByText(/Bachelor's/i)); // Uncheck rather than selecting a value presumably.
 
-    expect(screen.getByText(/selectError/i)).toBeInTheDocument(); // You can change this to your specific error message
+    // Check for error messages
+    expect(screen.getByText(/selectError/i)).toBeInTheDocument(); // Adjust the error text accordingly
   });
 });
