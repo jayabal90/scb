@@ -48,16 +48,10 @@ const MultiSelectionBox = (props: KeyWithAnyModel) => {
     );
     let preSelectedCode: string | null = null;
     if (
-      // stageSelector[0].stageInfo.applicants[0][
-      // props.data.logical_field_name
-      // ]
+      
       userInputSelector.applicants[0][props.data.logical_field_name]
     ) {
-      // preSelectedCode =
-      //   stageSelector[0].stageInfo.applicants[0][
-      //   props.data.logical_field_name
-      //   ];
-      preSelectedCode = userInputSelector.applicants[0][fieldIdAppend(props)];
+       preSelectedCode = userInputSelector.applicants[0][fieldIdAppend(props)];
     } else {
       if (userInputSelector.applicants[0][fieldIdAppend(props)])
         preSelectedCode =
@@ -410,10 +404,6 @@ const MultiSelectionBox = (props: KeyWithAnyModel) => {
               {maxCount && <div className="max-count">{language === CONSTANTS.LANG_EN ? "You have selected maximum options for " + props.data.rwb_label_name : language === CONSTANTS.LANG_CN ? "您已选择最多选项" + props.data.rwb_label_name : "您已選擇最多選項" + props.data.rwb_label_name} </div>}
               <div className="multi-select__expand">
                 {noResults ? 
-                // (selectedOption
-                //   .filter(searchFilter).length > 0) ?
-                //   selectedOption
-                //     .filter(searchFilter)
                 finalOptions.map((item: LovInputValModel, index: number) => {
                       return (
                         <div key={index} className="multi-select__item">
