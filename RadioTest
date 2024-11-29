@@ -2,119 +2,134 @@ import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { Provider } from "react-redux";
 import configureStore from "redux-mock-store";
-import { RadioWithLabel } from "./RadioWithLabel";
-import * as reactRedux from "react-redux";
+import RadioWithLabel from "./radio-with-label";
 
-// Mock utility functions used in the component
-jest.mock("../../../utils/common/change.utils", () => ({
-  fieldError: jest.fn(),
-  isFieldUpdate: jest.fn(),
-}));
-jest.mock("../../../services/common-service", () => ({
-  checkProductDetails: jest.fn(),
-}));
-jest.mock("../../../utils/common/constants", () => ({
-  CONSTANTS: {
-    STAGE_NAMES: { BD_3: "bd-3", AD_2: "ad-2" },
-    LOGICAL_FIELD_NAMES: { SUPPLEMENTARY_INVEST_EXPERINECE: "supplementary_invest_experience" },
-    LOV_DATA: { YES: "Yes", NO: "No", ONE: "One" },
-    LANG_EN: "en",
-  },
-}));
+const mockStore = configureStore([]);
 
 describe("RadioWithLabel Component", () => {
-  const mockStore = configureStore([]);
-  let store;
-  const mockDispatch = jest.fn();
+  let store: any;
+  let handleCallbackMock: jest.Mock;
+  let handleFieldDispatchMock: jest.Mock;
 
-  const mockState = {
-    stages: {
-      stages: [
-        {
-          stageId: "bd-3",
-          stageInfo: {
-            applicants: [{ investment_experience: "Yes", decision: "No" }],
-          },
-        },
-      ],
-      dynamicFields: { investment_experience: "Yes", cash_needs: "Yes" },
-      userInput: { applicants: [{ cash_needs: "Yes", decision: "No" }] },
-      parentChildFields: {},
-      investmentToggle: false,
+  const mockProps = {
+    data: {
+      logical_field_name: "test_field",
+      rwb_label_name: "Test Radio Group",
+      mandatory: "Yes",
+      editable: false,
+      info_tooltips: "Helpful Info",
+      details: "Detailed Info",
     },
-    fielderror: { error: false },
-    userAge: { userAge: 40 },
-    lov: [
-      {
-        label: "investment_experience",
-        value: [
-          { CODE_VALUE: "Yes", CODE_DESC: "Yes Description" },
-          { CODE_VALUE: "No", CODE_DESC: "No Description" },
-        ],
-      },
-    ],
-    urlParam: { products: [] },
+    handleCallback: jest.fn(),
+    handleFieldDispatch: jest.fn(),
   };
 
   beforeEach(() => {
-    store = mockStore(mockState);
-    jest.spyOn(reactRedux, "useSelector").mockImplementation((callback) => callback(store.getState()));
-    jest.spyOn(reactRedux, "useDispatch").mockReturnValue(mockDispatch);
+    store = mockStore({
+      stages: {
+        stages: [{ stageId: "BD_3", stageInfo: { applicants: [{ test_field: null }] } }],
+        dynamicFields: {},
+        parentChildFields: {},
+        userInput: { applicants: [{}] },
+        investmentToggle: false,
+      },
+      lov: {
+        lov: [
+          {
+            label: "test_field",
+            value: [
+              { CODE_VALUE: "option1", CODE_DESC: "Option 1", checked: false },
+              { CODE_VALUE: "option2", CODE_DESC: "Option 2", checked: false },
+            ],
+          },
+        ],
+      },
+      fielderror: { error: [] },
+      urlParam: { products: [] },
+    });
+
+    handleCallbackMock = jest.fn();
+    handleFieldDispatchMock = jest.fn();
   });
 
-  it("should render the component with the provided props", () => {
-    const handleCallbackMock = jest.fn();
-    const handleFieldDispatchMock = jest.fn();
-
+  it("renders the RadioWithLabel component correctly", () => {
     render(
       <Provider store={store}>
         <RadioWithLabel
-          data={{
-            logical_field_name: "investment_experience",
-            rwb_label_name: "Investment Experience",
-            mandatory: "Yes",
-            editable: true,
-          }}
+          {...mockProps}
           handleCallback={handleCallbackMock}
           handleFieldDispatch={handleFieldDispatchMock}
         />
       </Provider>
     );
 
-    // Verify the label and radio options are rendered
-    expect(screen.getByLabelText("Investment Experience")).toBeInTheDocument();
-    expect(screen.getByText("Yes Description")).toBeInTheDocument();
-    expect(screen.getByText("No Description")).toBeInTheDocument();
+    // Check if the label renders
+    expect(screen.getByText("Test Radio Group")).toBeInTheDocument();
+
+    // Check if radio buttons render
+    const radioButtons = screen.getAllByRole("radio");
+    expect(radioButtons).toHaveLength(2);
+
+    // Check if tooltip renders
+    expect(screen.getByText("Helpful Info")).toBeInTheDocument();
   });
 
-  it("should handle radio button selection and dispatch the correct actions", () => {
-    const handleCallbackMock = jest.fn();
-    const handleFieldDispatchMock = jest.fn();
-
+  it("handles radio button selection", () => {
     render(
       <Provider store={store}>
         <RadioWithLabel
-          data={{
-            logical_field_name: "investment_experience",
-            rwb_label_name: "Investment Experience",
-            mandatory: "Yes",
-            editable: true,
-          }}
+          {...mockProps}
           handleCallback={handleCallbackMock}
           handleFieldDispatch={handleFieldDispatchMock}
         />
       </Provider>
     );
 
-    // Simulate clicking the "Yes" radio button
-    const yesRadio = screen.getByLabelText("Yes Description");
-    fireEvent.click(yesRadio);
+    // Select the first radio button
+    const firstRadio = screen.getByLabelText("Option 1");
+    fireEvent.click(firstRadio);
 
-    // Verify that the callback and dispatch are called with the correct arguments
     expect(handleCallbackMock).toHaveBeenCalledWith(
-      { logical_field_name: "investment_experience", rwb_label_name: "Investment Experience", mandatory: "Yes", editable: true },
-      "Yes"
+      mockProps.data,
+      "option1"
     );
-    expect(mockDispatch).toHaveBeenCalled();
+    expect(handleFieldDispatchMock).toHaveBeenCalledWith(
+      "test_field",
+      "option1",
+      "Option 1"
+    );
+  });
+
+  it("displays an error when no option is selected and mandatory field is required", () => {
+    render(
+      <Provider store={store}>
+        <RadioWithLabel
+          {...mockProps}
+          handleCallback={handleCallbackMock}
+          handleFieldDispatch={handleFieldDispatchMock}
+        />
+      </Provider>
+    );
+
+    // Trigger validation by leaving options unselected
+    fireEvent.blur(screen.getByText("Test Radio Group"));
+
+    // Check if error message appears
+    expect(screen.getByText("Test Radio Group is required.")).toBeInTheDocument();
+  });
+
+  it("disables radio buttons when the field is not editable", () => {
+    render(
+      <Provider store={store}>
+        <RadioWithLabel
+          {...mockProps}
+          handleCallback={handleCallbackMock}
+          handleFieldDispatch={handleFieldDispatchMock}
+        />
+      </Provider>
+    );
+
+    const firstRadio = screen.getByLabelText("Option 1");
+    expect(firstRadio).toBeDisabled();
   });
 });
