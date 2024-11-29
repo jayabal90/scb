@@ -20,10 +20,7 @@ const SelectionBox = (props: KeyWithAnyModel) => {
   const lovSelector = useSelector((state: StoreModel) => state.lov);
   const parentChildToggleSelector = useSelector((state: StoreModel) => state.stages.parentChildFields)
   const cityDynamicFieldSelector = useSelector((state: StoreModel) => state.stages.cityDynamicField)
-  const [selectedOption, setSelectedOption] = useState<Array<LovInputValModel>>(
-    []
-  );
-
+  const [selectedOption, setSelectedOption] = useState<Array<LovInputValModel>>([]);
   let placeHolderValue
   if(props.data.rwb_label_name === "loan_purpose" ){
     placeHolderValue = "Loan Purpose*";
@@ -32,47 +29,15 @@ const SelectionBox = (props: KeyWithAnyModel) => {
   }
   const [placeholder, setPlaceHolder] = useState(placeHolderValue)
   const [radioDependency, setRadioDependency] = useState<RadioDependecyModel | null>();
-  const fieldErrorSelector = useSelector(
-    (state: StoreModel) => state.fielderror.error
-  );
-
+  const fieldErrorSelector = useSelector((state: StoreModel) => state.fielderror.error);
   const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
   const [show, hide] = useState(false);
-  const [selectedValue, setSelectedValue] = useState<Array<LovInputValModel>>(
-    []
-  );
+  const [selectedValue, setSelectedValue] = useState<Array<LovInputValModel>>([]);
   const language = getUrl.getLanguageInfo("lang")
   const [search, setSearch] = useState("");
   const dispatch = useDispatch();
-  const dependencyFieldsSelector = useSelector(
-    (state: StoreModel) => state.stages.dependencyFields
-  );
-  const userInputSelector = useSelector(
-    (state: StoreModel) => state.stages.userInput
-  );
-  //using declaration page
-  const relatedParty=userInputSelector.applicants[0].related_party;
-
-  const countryOfTaxResidence: KeyWithAnyModel = [
-    {
-      'label': 'country_of_tax_residence', 'value': ''
-    },
-    { 'label': 'country_of_tax_residence_1', 'value': '' },
-    { 'label': 'country_of_tax_residence_2', 'value': '' },
-    { 'label': 'country_of_tax_residence_3', 'value': '' },
-    { 'label': 'country_of_tax_residence_4', 'value': '' },
-  ];
-
-  let isCountryTaxResideancyField: boolean = false;
-  let logicalFieldSplittedArray = props.data.logical_field_name.split("_");
-  if (
-    logicalFieldSplittedArray &&
-    logicalFieldSplittedArray.length > 4 &&
-    logicalFieldSplittedArray[2] === "tax"
-  ) {
-    isCountryTaxResideancyField = true;
-  }
-
+  const dependencyFieldsSelector = useSelector((state: StoreModel) => state.stages.dependencyFields);
+  const userInputSelector = useSelector((state: StoreModel) => state.stages.userInput);
   useEffect(() => {
     if (props.data.logical_field_name === 'education_level') {
       setPlaceHolder(language === CONSTANTS.LANG_EN ? 'Education Level' : language === CONSTANTS.LANG_CN ? '教育程度' : '教育程度')
@@ -101,7 +66,6 @@ const SelectionBox = (props: KeyWithAnyModel) => {
 
       }
     }
-
     if (props.data.logical_field_name === "rationale") {
       if (stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name] === null
         || stageSelector[0].stageInfo.applicants[0][props.data.logical_field_name] === undefined) {
@@ -127,9 +91,6 @@ const SelectionBox = (props: KeyWithAnyModel) => {
         }
         return item;
       });
-      if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_1) {
-        
-      }
       setSelectedOption(dropDownData);
       if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5) {
         if (props.data.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_3 && cityDynamicFieldSelector.cityValue === 'city_3') {
@@ -157,35 +118,6 @@ const SelectionBox = (props: KeyWithAnyModel) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lovSelector.lov, props.data.logical_field_name, dependencyFieldsSelector, cityDynamicFieldSelector]);
-
-  const noResults = (selectedOption && selectedOption.filter((item: LovInputValModel) =>
-    item.CODE_DESC.toLowerCase().includes(search.toLowerCase())).length > 0);
-  const filtered = selectedOption && selectedOption.filter((item: LovInputValModel) =>
-    item.CODE_DESC.toLowerCase().includes(search.toLowerCase()));
-  const finalOptions = search === "" ? selectedOption : filtered;
-  const filteredOptions = finalOptions.filter(item => item.CODE_VALUE !=='LP16' && item.CODE_VALUE !=='72' && item.CODE_VALUE !=='84' );
-
-  const findCodeDesc = (preSelectedCode: string) => {
-    const currentFieldLovRes: Array<KeyWithAnyModel> = lovSelector.lov.filter(
-      (res: LovInputModel) => {
-        return (
-          res.label ===
-          (isCountryTaxResideancyField
-            ? "country_of_tax_residence"
-            : props.data.logical_field_name)
-        );
-      }
-    );
-    if (currentFieldLovRes.length > 0) {
-      const lovData = JSON.parse(
-        JSON.stringify(currentFieldLovRes[0].value)
-      );
-      return lovData.find((item: LovInputValModel) => (
-        item.CODE_VALUE === preSelectedCode && item.CODE_DESC
-      ));
-    }
-  }
-
   useEffect(() => {
     if (fieldError(fieldErrorSelector, props)) {
       setError(`${language === CONSTANTS.LANG_EN ? errorMsg.selectError : language === CONSTANTS.LANG_CN ? errorMsg.selectError_CN : errorMsg.selectError_HK}${props.data.rwb_label_name}`);
@@ -266,7 +198,6 @@ const SelectionBox = (props: KeyWithAnyModel) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
   const dropdownHandler = (event: React.MouseEvent<any>) => {
     /** Added to prevent selecting same country in Tax information starts*/
     if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_1) {
@@ -294,7 +225,6 @@ const SelectionBox = (props: KeyWithAnyModel) => {
     hide(true);
     setSearch("");
   };
-
   const close = () => {
     hide(false);
   };
@@ -316,18 +246,6 @@ const SelectionBox = (props: KeyWithAnyModel) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [radioDependency])
-
-  const parentChildInvestmentSelect = (radioDependency: RadioDependecyModel, removedata?: boolean) => {
-    if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5) {
-      dispatch(getFields(stageSelector, radioDependency, userInputSelector, parentChildToggleSelector, removedata))
-    } else if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_3) {
-      const stageComponents = dispatch(getFields(stageSelector, radioDependency, userInputSelector, parentChildToggleSelector, removedata))
-      setField(stageComponents)
-    } else if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_4) {
-      dispatch(getFields(stageSelector, radioDependency, userInputSelector, parentChildToggleSelector, removedata))
-    }
-  }
-
   const addUserInput = (data: LovInputValModel, logical_field_name: string) => {
     const previousSelectedOption = [...selectedOption];
     setRadioDependency({ logical_field_name: logical_field_name, value: data.CODE_VALUE });
@@ -345,11 +263,7 @@ const SelectionBox = (props: KeyWithAnyModel) => {
         return item;
       }
     );
-    if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_1) {
-      
-    }
     setSelectedOption(updatedSelectedOption);
-
     let value: Array<LovInputValModel> = [data];
     setSelectedValue(value);
     if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_5) {
@@ -361,15 +275,12 @@ const SelectionBox = (props: KeyWithAnyModel) => {
         dispatch(stagesAction.updateDynamicCityField({ 'label': CONSTANTS.LOGICAL_FIELD_NAMES.RES_CITY_4, 'value': 'city_4' }))
       }
     }
-
     hide(false);
-
     addLovData(logical_field_name, data["CODE_DESC"], data["CODE_VALUE"])
     setError('');
     if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.BD_3/* && (props.data.logical_field_name === "financial_institution" || props.data.logical_field_name === "financial_product")*/)
       dispatch(stagesAction.updateDynamicFields({ 'label': logical_field_name, 'value': data["CODE_VALUE"] }))
   };
-
   const addLovData = (logical_field_name: string, code_desc: string, code_value: string) => {
     dispatch(
       lovDescAction.addLovData({
@@ -389,9 +300,7 @@ const SelectionBox = (props: KeyWithAnyModel) => {
   ) => {
     event.stopPropagation();
     event.isPropagationStopped();
-
     const previousSelectedValue = [...selectedValue];
-
     let fieldIndex = previousSelectedValue.findIndex(
       (item: LovInputValModel) => item.CODE_VALUE === data["CODE_VALUE"]
     );
@@ -407,13 +316,9 @@ const SelectionBox = (props: KeyWithAnyModel) => {
       }
       return item;
     });
-    if (stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.AD_1) {
-      
-    }
     setSelectedOption(result);
     dispatch(ValueUpdateAction.getChangeUpdate({ id: stageSelector[0].stageId!, changes: true }));
     dispatch(isFieldUpdate(props, '', logical_field_name));
-   //props.handleCallback(logical_field_name, '');
     props.handleCallback(props.data, '');
     if ((props.data.mandatory === "Yes" || props.data.mandatory === "Conditional") && data.checked === false) {
       setError(`${language === CONSTANTS.LANG_EN ? errorMsg.selectError : language === CONSTANTS.LANG_CN ? errorMsg.selectError_CN : errorMsg.selectError_HK}${props.data.rwb_label_name}`);
@@ -452,7 +357,6 @@ const SelectionBox = (props: KeyWithAnyModel) => {
         )
       );
     }
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedValue]);
 
@@ -467,19 +371,12 @@ const SelectionBox = (props: KeyWithAnyModel) => {
       })
     );
   }
-
-  const getCountrySelector = () => {
-  return {};
-    //return countryOfTaxResidenceSelectedvalueSelector ? JSON.parse(countryOfTaxResidenceSelectedvalueSelector) : countryOfTaxResidence
-  }
-
   const handleCallback = (fieldName: string, value: string | number) => {
     props.handleCallback(fieldName, value);
   };
   const handleFieldDispatch = (fieldName: string, value: string | number) => {
     props.handleFieldDispatch(fieldName, value);
   };
-
   const focusHandler = (fieldName: string, event: React.FocusEvent<HTMLInputElement>) => {
     dispatch(lastAction.getField(fieldName));
   };
@@ -489,7 +386,6 @@ const SelectionBox = (props: KeyWithAnyModel) => {
   }
   return (
     <>
- 
       <div className="dropdown-select">
         <label htmlFor={props.data.logical_field_name}>
           {(selectedValue.length > 0 && !error) && <div className="tick-class"></div>}
