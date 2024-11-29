@@ -1,0 +1,73 @@
+import React from 'react';
+import { render } from '@testing-library/react';
+import Spinner from './Spinner'; // Adjust the import based on your file structure
+import { Provider } from 'react-redux';
+import configureStore from 'redux-mock-store';
+
+// Create a mock store
+const mockStore = configureStore([]);
+const store = mockStore({
+  stages: {
+    stages: [
+      {
+        stageInfo: {
+          application: {
+            channel_reference: null,
+          },
+        },
+      },
+    ],
+  },
+});
+
+describe('Spinner Component', () => {
+  it('renders the Lottie animation and loading text when loaderType is not provided', () => {
+    const { getByText } = render(
+      <Provider store={store}>
+        <Spinner />
+      </Provider>
+    );
+
+    // Check if the loading message is rendered
+    expect(getByText(/Processing.../i)).toBeInTheDocument();
+
+    // Check if the Lottie animation is rendered (you can check the <Player /> component exists)
+    expect(document.querySelector('.lottie__container')).toBeInTheDocument();
+  });
+
+  it('renders the correct messages for the showTimmer type', () => {
+    const { getByText } = render(
+      <Provider store={store}>
+        <Spinner loaderType="showTimmer" />
+      </Provider>
+    );
+
+    // Check if the thank you message is displayed
+    expect(getByText(/Thank you for your application. We are checking your details./i)).toBeInTheDocument();
+    expect(getByText(/Please do not close or refresh browser./i)).toBeInTheDocument();
+  });
+
+  it('renders the correct messages for the showSearchSpinner type', () => {
+    const { getByText } = render(
+      <Provider store={store}>
+        <Spinner loaderType="showSearchSpinner" />
+      </Provider>
+    );
+
+    // Check if the reviewing message is displayed
+    expect(getByText(/We are reviewing your application submission./i)).toBeInTheDocument();
+    expect(getByText(/Please do not close or refresh browser./i)).toBeInTheDocument();
+  });
+
+  it('renders the correct messages for the lastStep type', () => {
+    const { getByText } = render(
+      <Provider store={store}>
+        <Spinner loaderType="lastStep" />
+      </Provider>
+    );
+
+    // Check if the last step message is displayed
+    expect(getByText(/You’re at the last step!/i)).toBeInTheDocument();
+    expect(getByText(/Please do not close or refresh browser./i)).toBeInTheDocument();
+  });
+});
