@@ -1,0 +1,153 @@
+import React, { useEffect, useState } from 'react';
+import './spinner.scss';
+import { getUrl } from '../../../utils/common/change.utils';
+import { CONSTANTS } from '../../../utils/common/constants';
+import { useSelector } from 'react-redux';
+import { StoreModel } from '../../../utils/model/common-model';
+import { Player } from '@lottiefiles/react-lottie-player';
+import lottieSrc from "../../../assets/_json/lottie/motorcycle_insurance.json";
+
+
+const Spinner = (props: any) => {
+  const [currentYear, setCurrentYear] = useState(0);
+  const [requestUpdate, setRequestUpdate] = useState(true);
+  const language = getUrl.getLanguageInfo("lang");
+  const channelRefSelector = useSelector(
+    (state: StoreModel) => state.stages.stages[0].stageInfo?.application?.channel_reference
+  );
+  useEffect(() => {
+    let requestTimer = setTimeout(() => {
+      setRequestUpdate(false);
+    }, 10000);
+
+    const startYear = 1859;
+    const todate = new Date();
+    setCurrentYear(todate.getFullYear() - startYear);
+
+    return () => {
+      clearTimeout(requestTimer);
+    };
+  }, []);
+
+  return (
+    <>
+      {!props.loaderType && 
+        <div className={`lottie ${!channelRefSelector ? 'opacity': ''}`}>
+          <div className="lottie__container">
+            <Player src={lottieSrc} className="player" loop autoplay />
+            <div className="lottie__body">
+              <div className="lottie__text">
+                {requestUpdate ? <>Processing...</> : <>Working on it...</>}
+              </div>
+              <div className="lottie__footer">
+                <div>
+                  {requestUpdate ? (
+                    <>
+                      Did you know? The Bank opened its first branch in Singapore, {currentYear} years ago in 1859!
+                    </>
+                  ) : (
+                    <>
+                      Did you know? We first brought mobile banking (in the form of
+                      a bus) to SG more than half a century ago
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>  
+      }
+    {/* {!props.loaderType && 
+      <div className="spinner">
+        <div className="spinner__container">
+          <div className="spinner__icon"></div>
+          {props.type === 'saving' &&
+            <div className="spinner__text">{language === CONSTANTS.LANG_EN ? "Saving, Please Wait" : language === CONSTANTS.LANG_CN ? "正在保存，請稍候" : "正在保存，請稍候"}</div>
+          }
+
+        </div>
+      </div>
+    }    */}
+
+      {props.loaderType === "showTimmer" &&
+        <div id="spinner" className="hk-spinner blocker-spinner blocker-spinner-modal" ng-if="showTimmer">
+          <div id="hk-spinner" className="blocker---modal---wrapper">
+            <div className="blocker---inner-wrapper">
+              <div className="blocker---header">
+                <p className="loading_bar" data-grunticon-embed></p>
+                <p className="blocker---title-b visible-xs-block visible-sm-inline visible-md-inline visible-lg-inline">
+                  {language === CONSTANTS.LANG_CN ? "感謝您的申請！我們正在查閱您的資料" : "Thank you for your application. We are checking your details."}
+                </p><br /><br />
+                <p className="blocker---title visible-xs-block visible-sm-inline visible-md-inline visible-lg-inline">
+                  {language === CONSTANTS.LANG_CN ? "請不要關閉或重新整理瀏覽器" : "Please do not close or refresh browser."}
+                </p><br />
+                <p className="timmer" data-grunticon-embed></p>
+                <p className="visible-xs-block visible-sm-inline visible-md-inline visible-lg-inline spinnerSubText3">
+                  {language === CONSTANTS.LANG_CN ? "請稍候" : "Just a moment"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      {props.loaderType === "showSearchSpinner" &&
+        <div id="spinner" className="hk-spinner blocker-spinner blocker-spinner-modal" ng-if="showSearchSpinner">
+          <div id="hk-spinner" className="blocker---modal---wrapper">
+            <div className="blocker---inner-wrapper">
+              <div className="blocker---header">
+                <p className="loading_bar" data-grunticon-embed></p>
+                <p className="blocker---title-b visible-xs-block visible-sm-inline visible-md-inline visible-lg-inline">
+                  {language === CONSTANTS.LANG_CN ? "我們正在初步審批您的申請" : "We are reviewing your application submission."}
+                </p><br /><br />
+                <p className="blocker---title visible-xs-block visible-sm-inline visible-md-inline visible-lg-inline">
+                  {language === CONSTANTS.LANG_CN ? "請不要關閉或重新整理瀏覽器" : "Please do not close or refresh browser."}
+                </p><br />
+                <p className="searchSpinner" data-grunticon-embed></p>
+                <p className="visible-xs-block visible-sm-inline visible-md-inline visible-lg-inline SearchSpinnerSubText3">
+                  {language === CONSTANTS.LANG_CN ? "請稍候" : "Just a moment"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      {props.loaderType === "lastStep" &&
+
+        <div className="spinner hk-spinner blocker-spinner blocker-spinner-modal" ng-if="pageType=='FFD1'">
+          <div className="blocker---modal---wrapper">
+            <div className="blocker---inner-wrapper application-content">
+              <div className="blocker---header ">
+                <p className="loading_bar" data-grunticon-embed></p>
+                <p className="blocker---title-b align-left visible-xs-block visible-sm-inline visible-md-inline visible-lg-inline">
+                  {language === CONSTANTS.LANG_CN ? "最後一步!" : "You’re at the last step!"}
+                </p><br /><br />
+                <p className="blocker---title visible-xs-block visible-sm-inline visible-md-inline visible-lg-inline">
+                  {language === CONSTANTS.LANG_CN ? "請不要關閉或重新整理瀏覽器" : "Please do not close or refresh browser."}
+                </p><br />
+              </div>
+              <div>
+                <p className='ffd1-banner' data-grunticon-embed></p>
+                <p
+                  className="spinnerSubText3 visible-xs-block visible-sm-inline visible-md-inline visible-lg-inline details2">
+                  {language === CONSTANTS.LANG_CN ? "請稍候數分鐘，我們正在審批您的申請" : "Please wait a few minutes while we are reviewing on your application."}
+                </p>
+              </div>
+              {/* <div className="ffd1-section row">
+                <button ng-click="setFF2Default()" ng-disabled="vm.enableNextBtn" className="result-btn bg-green">
+                  {language === CONSTANTS.LANG_CN ? "查看最終批核結果" : "See final approval result"}
+                </button>
+              </div> */}
+            </div>
+          </div>
+        </div>
+
+      }
+
+
+    </>
+  );
+};
+
+export default Spinner;
