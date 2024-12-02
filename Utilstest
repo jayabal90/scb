@@ -1,96 +1,72 @@
-// getFields.test.tsx
-import { getFields } from './path/to/getFields';
-import { AppDispatch } from "../../../services/common-service"; // Adjust this import as necessary
-import { getLovData } from "../../../services/common-service";
-import { fieldErrorAction } from "../../../utils/store/field-error-slice";
-import { stagesAction } from "../../../utils/store/stages-slice";
-import { CONSTANTS } from "../../../utils/common/constants";
-import configureMockStore from 'redux-mock-store';
+import { getFields } from './path/to/your/getFields'; // Adjust the import path accordingly
+import { fieldErrorAction } from '../../../utils/store/field-error-slice';
+import { stagesAction } from '../../../utils/store/stages-slice';
+import configureStore from 'redux-mock-store';
 import thunk from 'redux-thunk';
-import { render, screen } from '@testing-library/react';
+import { CONSTANTS } from '../../../utils/common/constants';
 
-// Setup redux mock store
 const middlewares = [thunk];
-const mockStore = configureMockStore(middlewares);
-const store = mockStore({});
+const mockStore = configureStore(middlewares);
 
-jest.mock("../../../services/common-service", () => ({
-    getLovData: jest.fn(),
-    AppDispatch: jest.fn()
-}));
+describe('getFields', () => {
+    let store;
+    let dispatch;
 
-jest.mock("../../../utils/store/field-error-slice", () => ({
-    fieldErrorAction: {
-        removeMandatoryFields: jest.fn(),
-        getMandatoryFields: jest.fn(),
-    }
-}));
-
-jest.mock("../../../utils/store/stages-slice", () => ({
-    stagesAction: {
-        removeAddToggleField: jest.fn(),
-        updateDynamicFields: jest.fn(),
-        modifyStage: jest.fn(),
-        updateParentChildToggle: jest.fn(),
-    }
-}));
-
-describe('getFields function', () => {
     beforeEach(() => {
-        jest.clearAllMocks();
+        store = mockStore({});
+        dispatch = jest.fn();
     });
 
-    it('should dispatch actions and get mandatory fields properly for different radio residency values', () => {
-        const dispatch = jest.fn();
-        const inputStageDetails = [
-            {
-                stageId: 'someStageId',
-                stageInfo: {
-                    fieldMetaData: {
-                        data: {
-                            stages: [
-                                {
-                                    fields: [
-                                        { logical_field_name: 'some_field_1' },
-                                        { logical_field_name: 'some_field_2' },
-                                    ]
-                                }
-                            ]
-                        }
-                    },
-                    applicants: [{
-                        cash_needs: CONSTANTS.LOV_DATA.YES,
-                        education_level: 'some_level',
-                        investment_experience: CONSTANTS.LOV_DATA.YES,
-                    }],
-                }
+    it('should dispatch removeAddToggleFieldFn correctly when residency is present', () => {
+        const getStages = [{
+            stageId: 'sample-stage-id',
+            stageInfo: {
+                fieldMetaData: {
+                    data: {
+                        stages: [
+                            {
+                                fields: [
+                                    { logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE },
+                                    { logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION }
+                                ]
+                            }
+                        ]
+                    }
+                },
+                applicants: [{ cash_needs: 'YES', education_level: 'HIGH' }]
             }
+        }];
+
+        const radioResidency = { logical_field_name: 'id_type_cb', value: 'Exit-Entry Permit' };
+        const userInputs = { applicants: [{ investment_experience: 'YES' }] };
+        
+        const expectedActions = [
+            fieldErrorAction.removeMandatoryFields(['passport_no']),
+            stagesAction.removeAddToggleField({ removeFields: ['passport_no'], newFields: ['EEP', 'expiry_date'], value: '' }),
+            // Add more expected actions based on your logic
         ];
 
-        const mockRadioResidency = {
-            logical_field_name: 'id_type_cb',
-            value: 'Exit-Entry Permit'
-        };
+        const result = getFields(getStages, radioResidency, userInputs)(dispatch);
 
-        const userInputs = {
-            applicants: [
-                {
-                    investment_experience: 'yes',
-                    cash_needs: 'some',
-                }
-            ]
-        };
-
-        // Call the getFields function
-        const getFieldFunc = getFields(inputStageDetails, mockRadioResidency, userInputs);
-        getFieldFunc(dispatch); // Call it with the mocked dispatch
-
-        // Assert the dispatched actions and the expected behavior
-        expect(dispatch).toHaveBeenCalledWith(fieldErrorAction.removeMandatoryFields(expect.any(Array)));
-        expect(dispatch).toHaveBeenCalledWith(stagesAction.removeAddToggleField(expect.any(Object)));
-        expect(dispatch).toHaveBeenCalledWith(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE));
+        expect(dispatch).toHaveBeenCalledTimes(expectedActions.length);
+        expectedActions.forEach(action => expect(dispatch).toHaveBeenCalledWith(action));
     });
 
-    // More tests can be added to cover other scenarios, such as testing different radioResidency values,
-    // different userInputs, and edge cases as well.
+    // Add other test cases as needed
+    it('should return null if getStages is empty', () => {
+        const result = getFields([], null)(dispatch);
+        expect(result).toBe(null);
+    });
+
+    it('should handle investment experience correctly', () => {
+        const getStages = [/* Your mock stages data here */];
+        const radioResidency = { logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE, value: 'YES' };
+        const userInputs = { applicants: [{ investment_experience: 'YES' }] };
+
+        getFields(getStages, radioResidency, userInputs)(dispatch);
+
+        // Assert on the actions that should be dispatched
+    });
+
+    // Other test cases should follow the pattern above.
 });
