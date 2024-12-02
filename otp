@@ -1,0 +1,489 @@
+import React, { useState, useEffect } from "react";
+import "./otp-model.scss";
+import { KeyWithAnyModel, StoreModel } from "../../../utils/model/common-model";
+import modelInfo from "../../../assets/_json/model.json";
+import Model from "../model/model";
+import { getUrl } from "../../../utils/common/change.utils";
+import { CONSTANTS } from "../../../utils/common/constants";
+import { useDispatch, useSelector } from "react-redux";
+import { gbaGenerate, gbaVerify } from "../../../services/common-service";
+import encrypt from "../../../services/encryption";
+import { submitRequest } from "../../../modules/dashboard/fields/fields.utils";
+import { pageScrollTop } from "../../../modules/dashboard/fields/stage.utils";
+import { useNavigate } from "react-router-dom";
+import { stagesAction } from "../../../utils/store/stages-slice";
+import submitService from "../../../services/submit-service";
+import Spinner from "../spinner/spinner";
+import axios from "axios";
+import {  getDataFormConfig, getDedupeData, getEnquiryData, getGenerateOtp, getRandomChallenge, getVerifyOtp } from "../../../modules/preApproval/services/preApprovalServices";
+import { preApprovalAction } from "../../../modules/preApproval/store/preApproval-slice";
+import { dedupeDataPayload } from "../../../modules/preApproval/services/payload";
+import { urlParamAction } from "../../../utils/store/urlparam-slice";
+import AlertModel from "../../../modules/preApproval/alertModal/alert-modal";
+import PopupModel from "../popup-model/popup-model";
+import PreApprovalUtil from "../../../modules/preApproval/services/preApprovalUtils";
+
+const OTPModel = () => {
+  const modelsData: KeyWithAnyModel = modelInfo;
+  const modelData = modelsData.find((model: any) => model.name === "otpSubmit");
+  const [otpModel, setOtpModel] = useState(true);
+  const [seconds, setSeconds] = useState(100);
+  const [modelName, setModelName] = useState("");
+  const [showDidntReceiveOTP, setShowDidntReceiveOTP] = useState(false);
+  // const [triggerCount, setTriggerCount] = useState(1);
+  const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
+  console.log('stageSelector',stageSelector);
+  const lovSelector = useSelector((state: StoreModel) => state.lov);
+  const applicantsSelector = useSelector(
+    (state: StoreModel) => state.stages.userInput.applicants[0]
+  );
+  const resumeFlag = useSelector(
+    (state: StoreModel) => state.stages
+  );
+  const valueSelector = useSelector((state: StoreModel) => state.valueUpdate);
+  const applicationJourney = useSelector(
+    (state: StoreModel) => state.stages.journeyType
+  );
+  const navigate = useNavigate();
+  const userInputSelector = useSelector(
+    (state: StoreModel) => state.stages.userInput
+  );
+  const errorSelector = useSelector((state: StoreModel) => state.error);
+  // const [stageId, setStageId] = useState<string>(CONSTANTS.STAGE_NAMES.SSF_1);
+  const otpPrefix = "FBrv - ";
+  // const mobile = stageSelector[0]
+  //   ? stageSelector[0].stageInfo.applicants[0].mobile_number_rwb
+  //   : window.localStorage.getItem("mobileNumber");
+  // const mobile = "+86-98989898989";
+  // const mobile = "+852-88389099";  
+  const sessionuid = useSelector((state: StoreModel) => state.auth.sessionUid);
+  const mobile = useSelector((state: StoreModel) => state.stages.userInput.applicants[0]?.mobile_number);
+  const last4Numbers = "*****" + mobile?.slice(mobile.length - 4);
+  const otpList = ['1', '2', '3', '4', '5', '6'];
+  const [otpVal, setOtpVal] = useState([]);
+  const [otpVerified, setOtpVeried] = useState(false);
+  const language = getUrl.getLanguageInfo("lang");
+  let rcFlagOTP = '';
+  const dispatch = useDispatch();
+  const [otpGenResponse, setOtpGenResponse] = useState<KeyWithAnyModel>({});
+  const [randomChallengeData, setRandomChallengeData] = useState<KeyWithAnyModel>({});
+  const [retryCount, setRetryCount] = useState('0');
+  const [show500Model, setShow500Model] = useState(false);
+  const [showtooManyAttempt, setShowTooManyAttempt] = useState(false)
+  const [showExpiredOTP, setShowExpiredOTP] = useState(false);
+  const [showInvalidOTP, setShowInvalidOTP] = useState(false);
+  const [showDeliveryFailedOTP, setShowDeliveryFailed] = useState(false);
+  const [showAuthenticateErrorOTP, setShowAuthenticateErrorOTP] = useState(false);
+  const [showNoMobileNumber, setShowNoMobileNumber] = useState(false);
+  const [zeroTimer, setZeroTimer] = useState(false);
+  const [declineModal, setDeclineModal] = useState(false);
+  const [resubmitModal, setResubmitModal] = useState(false);
+  const [otpNotModal, setOtpNotModal] = useState(false);
+  const [modalMsg, setModalMsg] = useState("");
+
+  const modelSelector = useSelector((state: StoreModel) => state.model.toggleModel)
+
+  const formConfigmetaData = useSelector((state: StoreModel) => state.preApproval.formConfigmetaData);
+  console.log(formConfigmetaData)
+  const channel_reference_no = formConfigmetaData?.application?.channel_reference;
+  console.log(channel_reference_no)
+  const productData = formConfigmetaData?.products[0];
+  const otpData = useSelector((state: StoreModel) => state.preApproval.otpData);
+  const randomData = useSelector((state: StoreModel) => state.preApproval.randomChallengeData);
+  const userInput = useSelector((state: StoreModel) => state.stages.userInput);
+
+  useEffect(() => {
+    getRandomChallenge(channel_reference_no).then(async(response:any)=>{
+      if(response.status===400 || response.status===501){
+        setModelName("OTPNot");
+        setOtpNotModal(true);
+      } 
+      if(response.status >= 200 || response.status <= 300) {
+        var responseData = response.data;
+        setRandomChallengeData(responseData.data.attributes);
+        dispatch(preApprovalAction.setRandomChallengeData(responseData.data.attributes));
+        // setOtpVeried(false);
+        // setOtpModel(true);
+        await getGenerateOtp(productData).then(async(res:any)=>{
+          console.log(res)
+          setOtpGenResponse(res.data.data.attributes)
+          if(response.status >= 200 || response.status <= 300) {
+            setOtpVeried(false);
+            setOtpModel(true);
+          }
+        })
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if(seconds==0){
+      setZeroTimer(true)
+    }
+    if (seconds > 0) {
+      const timer = setTimeout(() => setSeconds(seconds - 1), 1000);
+      setShowDidntReceiveOTP(false);
+      return () => {
+        clearTimeout(timer);
+      };
+    } else {
+      setShowDidntReceiveOTP(true);
+    }
+
+  }, [seconds]);
+
+  const updateRetryCount = (retryCount: string | undefined | null) => {
+    if (retryCount) {
+      setRetryCount(retryCount)
+    }
+  }
+  
+  const expiredOtpDone = () => {
+    setShowExpiredOTP(false);
+    setShowInvalidOTP(false);
+  }
+
+  const submitSuccess = () => {
+    dispatch(
+      submitRequest(
+        applicantsSelector,
+        stageSelector[0],
+        valueSelector,
+        lovSelector,
+        applicationJourney,
+        userInputSelector,
+        errorSelector,
+        resumeFlag
+      )
+    ).then((stage: string) => {
+      if (stage === "ffd-1") {
+        navigate("/hk/thankyou");
+      } else if (stage === "bd-2") {
+        dispatch(stagesAction.setOtpShow(false));
+      } else {
+        // setStageId(stage);
+      }
+      pageScrollTop();
+    });
+  }
+
+  // let count = 1;
+  const didntReceiveOtp = () => {
+    setZeroTimer(false)
+    setOtpVal([]);
+    setShowDidntReceiveOTP(true)
+    if (!showExpiredOTP) {
+      otpList.map((i) => (
+        (document.getElementById("otp" + i) as HTMLInputElement).value = ""
+      ))
+    }
+    getRandomChallenge(channel_reference_no).then(async(response:any)=>{
+      if(response.status===400 || response.status===501){
+        setModelName("OTPNot");
+        setOtpNotModal(true);
+      }  
+      if(response.status === 201) {
+        var responseData = response.data;
+        setRandomChallengeData(responseData.data.attributes);
+        dispatch(preApprovalAction.setRandomChallengeData(responseData.data.attributes));
+      }
+      console.log(response)
+      // await gbaGenerateOtp(rcFlagOTP, '1258').then(async(res)=>{
+      await getGenerateOtp(productData).then(async(res:any)=>{
+        console.log(res)
+        setSeconds(100);
+        expiredOtpDone();
+      })
+    });
+  }
+
+  const requestNewOtp = language === CONSTANTS.LANG_EN ? `REQUEST NEW OTP IN ${seconds} SECONDS` : language === CONSTANTS.LANG_CN ? `在 ${seconds} 秒内获取新的一次有效密码` : `在  ${seconds} 秒內獲取新的一次有效密碼`;
+
+  const otpBinding = (otp: any, id: string, index: number) => {//onChange Handler
+
+    const charCode = otp.charCodeAt(0);
+    let shrinkArr: any = [...otpVal];
+    if (otp !== '' && otp !== null) {
+      shrinkArr[index] = otp;
+      setOtpVal(shrinkArr);
+    } else if (otp === "") {
+      shrinkArr[index] = "";
+      setOtpVal(shrinkArr);
+    }
+    if (charCode >= 48 && charCode <= 57) {
+      const restrictOtp = shrinkArr.filter((letter: any) => { return letter !== '' && letter !== undefined; });
+      if (shrinkArr.length === 6 && restrictOtp.length === 6) {
+        let singleOtp = (shrinkArr[0] ? shrinkArr[0] : '') + (shrinkArr[1] ? shrinkArr[1] : '') + (shrinkArr[2] ? shrinkArr[2] : '')
+          + (shrinkArr[3] ? shrinkArr[3] : '') + (shrinkArr[4] ? shrinkArr[4] : '') + (shrinkArr[5] ? shrinkArr[5] : '');
+        setOtpVal(singleOtp);
+        //get verifyotp api integrate after implement of Redux API
+
+        // gbaVerifyOtp(singleOtp, stageSelector[0] ? stageSelector[0].stageInfo.products[0].product_type : null);
+        // navigate("/hk/spinner", {state:{loaderType:"showTimmer"}});
+        setOtpModel(false);
+        setShow500Model(false);
+        setShowAuthenticateErrorOTP(false);
+        setShowDeliveryFailed(false);
+        setShowExpiredOTP(false);
+        setOtpVeried(true);
+        setSeconds(0);
+        getRandomChallenge(channel_reference_no).then(async(response:any)=>{
+          console.log(response)
+          // gbaRandomChallenge().then(async(response:any)=>{
+          if(response.status >= 200 || response.status <= 300) {
+            var responseData = response.data;
+            setRandomChallengeData(responseData.data.attributes);
+            getVerifyOtp(singleOtp, responseData.data.attributes, otpGenResponse, channel_reference_no).then(async(response:any)=>{
+              console.log(response)
+              if(response.status === 201) {
+                await getEnquiryData(productData, applicantsSelector, channel_reference_no).then(async(response:any)=>{
+                  console.log(response)
+                  if(response.status === 200) {
+                    await getDedupeData(channel_reference_no).then(async(response:any)=>{
+                      console.log(response)     
+                      if(response.status === 200 ) {
+                        let applicants= response.data.applicants;
+                        let application= response.data.application;
+                        var isSuccessful = false;
+                        var responseType = response.data.application.response_type.toUpperCase();
+                        var responseAction = response.data.application.response_action.toUpperCase();
+                        var errorResp=response.data.application.error;
+                        if(responseAction=='SUCCESS' || responseType =='INFO' || (responseType=='SOFT' && responseAction == 'CONTINUE')) {
+                          let stageData = JSON.parse(JSON.stringify(stageSelector[0].stageInfo));
+                          stageData.applicants[0] = applicants;
+                          stageData.application = application;
+                          stageData.application = application;
+                          if(response.data.applicant_documents) {
+                            stageData.applicant_documents = response.data.applicant_documents;
+                          }
+                          dispatch(stagesAction.getStage({
+                            id: stageSelector[0].stageId,
+                            formConfig: stageData,
+                          }))
+                          let formStageData = JSON.parse(JSON.stringify(formConfigmetaData));
+                          formStageData.applicants = applicants;
+                          dispatch(preApprovalAction.setFormConfigMetaData(formStageData));
+                          dispatch(urlParamAction.getAuthorize({"applicationRefNo":response.data.application.application_reference}));
+                          dispatch(preApprovalAction.setApplicantDouments(response.data.applicant_documents));
+                          dispatch(preApprovalAction.setDedupeApplication(response.data.application));
+                          dispatch(preApprovalAction.setNextStages(response.data.stage.next_page_values));
+                          dispatch(getDataFormConfig(PreApprovalUtil.getFormConfigPayload())).then((response:any)=>{
+                            if(response.status === 200) {
+                              dispatch(stagesAction.setOtpShow(false));
+                            }
+                            if(responseType==='HARD' && (responseAction==='STOP' || responseAction==='RESUBMIT')){
+                              //'Sorry we are currently unable to process your application.'
+                              isSuccessful = true;
+                              if(responseAction==='STOP'){
+                                setModelName("Decline");
+                                setDeclineModal(true);
+                              }else if(responseAction==='RESUBMIT'){
+                                dispatch(stagesAction.updateStageId(CONSTANTS.STAGE_NAMES.PD_1));
+                                dispatch(stagesAction.setOtpShow(false));
+                              }
+                              setOtpVeried(false);
+                            } 
+                            if(responseType=='HARD' && responseAction=='CORRECT RESUBMIT'){
+                              //'Sorry we are currently unable to process your application.'
+                              dispatch(stagesAction.setOtpShow(false));
+                              isSuccessful = false;
+                              setModelName("A01");
+                              setOtpVeried(false);
+                              setOtpModel(true);
+                            } 
+                          })
+                        }
+                        if(responseType==='HARD' && (responseAction==='STOP' || responseAction==='RESUBMIT')){
+                          //'Sorry we are currently unable to process your application.'
+                          isSuccessful = true;
+                          if(responseAction==='STOP'){
+                            setModelName("Decline");
+                            setDeclineModal(true);
+                          }else if(responseAction==='RESUBMIT'){
+                            debugger;
+                            setModelName("Resubmit");
+                            setResubmitModal(true);
+                            if(errorResp.application_error.length>0 || errorResp.applicant_error.length>0 || errorResp.product_error.length>0){
+                                setModalMsg(errorResp.application_error[0]["error_description"] || errorResp.applicant_error[0]["error_description"] || errorResp.product_error[0]["error_description"])
+
+                            }
+                          }else{
+                            dispatch(stagesAction.updateStageId(CONSTANTS.STAGE_NAMES.PD_1));
+                            dispatch(stagesAction.setOtpShow(false));
+                            setOtpVeried(false);
+                          }
+                        } 
+                        if(responseType=='HARD' && responseAction=='CORRECT RESUBMIT'){
+                          //'Sorry we are currently unable to process your application.'
+                          dispatch(stagesAction.setOtpShow(false));
+                          isSuccessful = false;
+                          setModelName("A01");
+                          setOtpVeried(false);
+                          setOtpModel(true);
+                        }
+                      
+                      }
+                    })
+                  }
+                  else {
+                    setShowInvalidOTP(true);
+                    setOtpVeried(false);
+                    setOtpModel(true);
+                  }
+                })
+              }
+            })
+          }
+          else {
+            switch (parseInt(id)) {
+              case 1:
+                shrinkArr[index] = "";
+                break;
+              case 2:
+                shrinkArr[index] = "";
+                break;
+              case 3:
+                shrinkArr[index] = "";
+                break;
+              case 4:
+                shrinkArr[index] = "";
+                break;
+              case 5:
+                shrinkArr[index] = "";
+                break;
+              case 6:
+                shrinkArr[index] = "";
+                break;
+            }
+            setOtpVal(shrinkArr);
+          }
+        })  
+      }
+    }
+  }
+
+  const onElementKeyUp = (event: any, index: any) => {  //For moving next input fields
+    let fieldIntIndex = parseInt(index);
+    const nextField = document.getElementById('otp' + (fieldIntIndex + 1));
+    const prevField = document.getElementById('otp' + (fieldIntIndex - 1));
+    if (nextField !== null && event.target.value !== '' && event.target.value !== null) {
+      (nextField as HTMLInputElement).focus();
+    }
+    else if (prevField !== null && event.target.value === "") {
+      (prevField as HTMLInputElement).focus();
+    }
+  }
+const goBack =()=>{
+  setDeclineModal(false)
+  window.location.href = `${process.env.REACT_APP_HOME_PAGE_URL}`;
+}
+const reTry =()=>{
+  setResubmitModal(false)
+}
+const OtpNotModal =()=>{
+  setOtpNotModal(false);
+  setOtpModel(false);
+}
+  return (
+    <>
+      {(otpModel && modelData && retryCount <= CONSTANTS.MAXRETRYCOUNT) ? (
+        <div className="onetp-parent">
+          <div className="onetp-new">
+           {zeroTimer &&
+              <div className="username-box">
+                <span className="otp-alert-icon"></span>
+                <p className="Your-last-requested">{language === CONSTANTS.LANG_CN ? "你的一次性密碼已經不再有效。請索取新的一次性密碼並在100秒內輸入" : "Your last requested OTP has expired and is no longer valid. Please request a new OTP and input the OTP within 100 seconds."}</p>
+                <span onClick={()=>setZeroTimer(false)} className="x-button-reversed"></span>
+              </div>
+            }
+            <div className="security-banner">
+              <span className="icon_sc_l_protect_your_belongings"></span>
+            </div>
+
+            <div className="onetp-head-crt">
+              {!showExpiredOTP ? 
+                <>
+                  {/* <p>{language === CONSTANTS.LANG_EN ? modelData.header_content : language === CONSTANTS.LANG_CN ? modelData.header_content_CN : modelData.header_content_HK}<br /> ({last4Numbers}) mobile number.</p> */}
+                  <div className="secutiry-content">
+                    <p className="An-SMS-with-OTP-pass">{language === CONSTANTS.LANG_EN ? modelData.header_content : language === CONSTANTS.LANG_CN ? modelData.header_content_CN : modelData.header_content_HK}<br /> ({last4Numbers}) mobile number.</p>
+                    <p className="Enter-the-6-digit-co">Enter the 6-digit code sent to *** ({last4Numbers})</p>
+                  </div>
+                  <div className="otp-text-field">
+                    <span className="FBrv--">{otpGenResponse['otp-prefix'] ? otpGenResponse['otp-prefix'] : otpPrefix}</span>
+                    <ul className="otp-input-text">{otpList.map((x, index) => (
+                      <li key={x}>
+                        <input type="password" maxLength={1} id={'otp' + x} name={'otp' + x} inputMode="numeric" value={otpVal[index]}
+                          onChange={(e) => otpBinding(e.target.value, x, index)} onKeyUp={(e) => onElementKeyUp(e, x)} />
+                      </li>))}</ul>
+                  </div>
+
+                  {/* incorrect otp validation */}
+                  {showInvalidOTP &&
+                    <div className="onetp__field-error">{language === CONSTANTS.LANG_EN ? modelData.incorrectOtpText : language === CONSTANTS.LANG_CN ? modelData.incorrectOtpText_CN : modelData.incorrectOtpText_HK}</div>
+                  }
+
+                  {!showDidntReceiveOTP ? 
+                    <div className="onetp-timer">{requestNewOtp}</div> 
+                  :
+                    (
+                    // <div className="resend-otp" onClick={didntReceiveOtp}>Resend Otp?</div>)
+                    <div className="resend-otp" onClick={didntReceiveOtp}>{language === CONSTANTS.LANG_EN ? modelData.requestnewotp : language === CONSTANTS.LANG_CN ? modelData.requestnewotp_CN : modelData.requestnewotp_HK}</div>)
+                  }
+                </>
+                :
+                <div className="onetp-head-expired" >
+
+                  {/* expired otp validation */}
+                  <h5 className="expired-color">{language === CONSTANTS.LANG_EN ? modelData.expiredotptext1 : language === CONSTANTS.LANG_CN ? modelData.expiredotptext1_CN : modelData.expiredotptext1_HK}</h5>
+                  <p className="expired-txt">{language === CONSTANTS.LANG_EN ? modelData.expiredotptext2 : language === CONSTANTS.LANG_CN ? modelData.expiredotptext2_CN : modelData.expiredotptext2_HK}</p>
+                  <p className="try-again">{language === CONSTANTS.LANG_EN ? modelData.expiredotptext3 : language === CONSTANTS.LANG_CN ? modelData.expiredotptext3_CN : modelData.expiredotptext3_HK}</p>
+                  <div className="onetp-error" onClick={didntReceiveOtp}>{language === CONSTANTS.LANG_EN ? modelData.resendotp : language === CONSTANTS.LANG_CN ? modelData.resendotp_CN : modelData.resendotp_HK}</div>
+
+                </div>
+              }
+            </div>
+            {/* <div className="close-icon"><Close name={modelData.name} /></div> */}
+            {/* </div> */}
+          </div>
+        </div>
+        //) : <Model name="maximumAttempt" /*handlebuttonClick={handlePm opupBackButton}*/ />}
+
+      ) 
+      : 
+        otpVerified && <Spinner loaderType="showTimmer" />
+      }
+
+      {(show500Model || showtooManyAttempt || showAuthenticateErrorOTP || showDeliveryFailedOTP || modelSelector || showNoMobileNumber) && (
+        <Model name={show500Model ? "maximumAttempt" :
+          showtooManyAttempt ? "tooManyAttempt" :
+            showAuthenticateErrorOTP ? 'authenticateError' :
+              showDeliveryFailedOTP ? 'deliveryFailed' :
+                showNoMobileNumber ? 'noMobileNumber' :
+                 modelSelector ? 'techincalissue' : modelName} />
+      )}
+
+      {modelName && modelName==="Decline" && declineModal &&
+        <PopupModel displayPopup={declineModal}>
+            <AlertModel alertType={modelName} goBack={goBack}/>
+          
+        </PopupModel>
+      }  
+      {modelName && modelName==="Resubmit" && resubmitModal &&
+
+        <PopupModel displayPopup={resubmitModal}>
+            <AlertModel alertType={modelName} goBack={reTry} message={modalMsg}/>
+        </PopupModel>
+      }  
+      {modelName && modelName==="OTPNot"&&
+
+        <PopupModel displayPopup={otpNotModal}>
+            <AlertModel alertType={modelName} goBack={OtpNotModal} />
+        </PopupModel>
+      }  
+    </>
+  );
+
+};
+
+export default OTPModel;
