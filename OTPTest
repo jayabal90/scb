@@ -1,88 +1,106 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { Provider } from 'react-redux';
-import configureStore from 'redux-mock-store';
-import OTPModel from './OTPModel'; // Adjust the import according to the file structure
-import * as redux from 'react-redux';
+import OTPModel from './OTPModel';
+import { useSelector, useDispatch } from 'react-redux';
+import * as preApprovalServices from '../../../modules/preApproval/services/preApprovalServices';
+import '@testing-library/jest-dom';
 
-const mockStore = configureStore([]);
+jest.mock('react-redux', () => ({
+  useSelector: jest.fn(),
+  useDispatch: jest.fn(),
+}));
 
-jest.mock('react-redux');
+jest.mock('../../../modules/preApproval/services/preApprovalServices', () => ({
+  getRandomChallenge: jest.fn(),
+  getGenerateOtp: jest.fn(),
+  getVerifyOtp: jest.fn(),
+  getDedupeData: jest.fn(),
+  getEnquiryData: jest.fn(),
+}));
 
-describe('OTPModel Component', () => {
-  let store;
-
+describe('<OTPModel />', () => {
+  const mockDispatch = jest.fn();
   beforeEach(() => {
-    store = mockStore({
-      stages: {
-        stages: [{}],
-        userInput: {
-          applicants: [{ mobile_number: '+852-88389099' }]
-        },
-        journeyType: 'testJourney',
-      },
-      lov: {},
-      valueUpdate: {},
-      error: {},
-      auth: {
-        sessionUid: 'some-session-id',
-      },
-      preApproval: {
-        formConfigmetaData: {
-          application: { channel_reference: '12345' },
-          products: [{}],
-        },
-        otpData: {},
-        randomChallengeData: {},
-      },
-      model: {
-        toggleModel: true
+    useDispatch.mockReturnValue(mockDispatch);
+    useSelector.mockImplementation((selectorFn) => {
+      if (selectorFn.name === 'stageSelector') {
+        return [{ stageInfo: { applicants: [{ mobile_number: '+852-12345678' }] } }];
       }
+      if (selectorFn.name === 'auth') {
+        return { sessionUid: 'testSessionUID' };
+      }
+      if (selectorFn.name === 'preApproval') {
+        return {
+          formConfigmetaData: {
+            application: {
+              channel_reference: 'testChannelReference',
+            },
+            products: [{ product_type: 'testType' }],
+          },
+          otpData: {},
+          randomChallengeData: {},
+        };
+      }
+      // Specify other selectors as needed...
+      return {};
     });
-
-    redux.useSelector.mockImplementation(callback => callback(store.getState()));
-    redux.useDispatch.mockReturnValue(jest.fn());
   });
 
-  test('renders OTPModel component', () => {
-    render(
-      <Provider store={store}>
-        <OTPModel />
-      </Provider>
-    );
+  test('renders OTP input fields and submits OTP', async () => {
+    render(<OTPModel />);
 
-    expect(screen.getByText(/Enter the 6-digit code sent to/i)).toBeInTheDocument();
-  });
+    // Check if the OTP input fields are visible
+    const otpInputs = screen.getAllByRole('textbox');
+    expect(otpInputs).toHaveLength(6); // There should be 6 OTP input fields
 
-  test('handles OTP input and submission', async () => {
-    render(
-      <Provider store={store}>
-        <OTPModel />
-      </Provider>
-    );
-
-    const otpInputs = await screen.findAllByRole('textbox');
-
-    // Simulate typing in OTP inputs
+    // Simulate entering OTP
     otpInputs.forEach((input, index) => {
-      fireEvent.change(input, { target: { value: String(index + 1) } });
-      if (index < otpInputs.length - 1) {
-        fireEvent.keyUp(input, { key: 'ArrowRight' });
-      }
+      fireEvent.change(input, { target: { value: index + 1 } }); // Enter '1', '2', '3', '4', '5', '6'
     });
 
-    // Assuming there is a way to submit the OTP after filling it
-    // You might need to find the button for submission and click it
-    // e.g.
-    // fireEvent.click(screen.getByRole('button', { name: /submit/i }));
+    // Mock API behavior
+    preApprovalServices.getRandomChallenge.mockResolvedValueOnce({
+      status: 200,
+      data: { attributes: { /*...Response data*/ }},
+    });
+    preApprovalServices.getVerifyOtp.mockResolvedValueOnce({
+      status: 201,
+      data: { /*...Response data*/ },
+    });
 
-    // Validate if some expected change occurs, e.g., navigation occurs or a message gets displayed
-    // await waitFor(() => expect(someCondition).toBeTruthy());
+    // Find the submit button or trigger the correct method to validate OTP
+    // You'll need to adjust this part based on your implementation if there's a submit button
+    fireEvent.change(otpInputs[0], { target: { value: '1' } });
+    
+    await waitFor(() => {
+      expect(mockDispatch).toHaveBeenCalled(); // Check if the dispatch was called
+      // Add here additional expectations based on what should happen after OTP verification
+    });
+
+    // Check if the appropriate success or error message appears based on the mocked response
+    expect(screen.queryByText(/success message/i)).toBeInTheDocument();
   });
 
-  // Add more test cases as needed for various functionalities
+  test('displays error message when OTP is invalid', async () => {
+    render(<OTPModel />);
 
-  afterEach(() => {
-    jest.clearAllMocks();
+    const otpInputs = screen.getAllByRole('textbox');
+    
+    // Simulate entering OTP
+    otpInputs.forEach((input, index) => {
+      fireEvent.change(input, { target: { value: index + 1 } }); // Enter '123456'
+    });
+
+    preApprovalServices.getVerifyOtp.mockResolvedValueOnce({
+      status: 400,
+      data: { /*...Error response data*/ },
+    });
+
+    // Trigger the OTP verification function
+    fireEvent.change(otpInputs[0], { target: { value: '1' } });
+    
+    await waitFor(() => {
+      expect(screen.queryByText(/invalid otp/i)).toBeInTheDocument();
+    });
   });
 });
