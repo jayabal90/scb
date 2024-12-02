@@ -1,71 +1,111 @@
-import { getFields } from './path/to/your/action'; // Update with the correct path to your action file
-import { CONSTANTS } from '../../../utils/common/constants'; 
+// getFields.test.ts
+import React from 'react';
+import { render } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import configureStore from 'redux-mock-store';
+import thunk from 'redux-thunk';
+import { getFields } from './path/to/getFields'; // Adjust the import to your actual path.
+import { CONSTANTS } from '../../../utils/common/constants';
 import { fieldErrorAction } from '../../../utils/store/field-error-slice';
 import { stagesAction } from '../../../utils/store/stages-slice';
 
-const mockDispatch = jest.fn();
-const mockGetLovData = jest.fn(); // Mock the getLovData function if used
-const mockFindIndex = jest.fn(); // Mock the FindIndex function if used
-const getLovData = jest.spyOn(require('../../../services/common-service'), 'getLovData').mockImplementation(mockGetLovData);
-const FindIndex = jest.spyOn(require('../../../utils/common/change.utils'), 'FindIndex').mockImplementation(mockFindIndex);
+const middlewares = [thunk];
+const mockStore = configureStore(middlewares);
 
 describe('getFields action creator', () => {
+    let store;
 
-  beforeEach(() => {
-    jest.clearAllMocks(); // Clears mock calls and instances before each test
-  });
+    beforeEach(() => {
+        store = mockStore({
+            // initial state can go here
+        });
+    });
 
-  it('should dispatch the correct actions when radioResidency is provided', () => {
-    const userInputs = {
-      applicants: [{
-        [CONSTANTS.LOGICAL_FIELD_NAMES.NATURE_OF_EMPLOYER]: 'Some Employer'
-      }]
-    };
-
-    const getStages = [{
-      stageId: 'bd-3',
-      stageInfo: {
-        fieldMetaData: {
-          data: {
-            stages: [{
-              fields: [{ logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.NATURE_OF_EMPLOYER }]
-            }]
-          }
+    const mockStages = [
+        {
+            stageId: 'bd-3',
+            stageInfo: {
+                fieldMetaData: {
+                    data: {
+                        stages: [
+                            {
+                                fields: [
+                                    { logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.NATURE_OF_EMPLOYER },
+                                    { logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION_1 },
+                                    // more fields as needed...
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
         }
-      }
-    }];
-
-    const radioResidency = {
-      logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION,
-      value: '999'
-    };
-
-    const expectedActions = [
-      fieldErrorAction.removeMandatoryFields(expect.anything()), // Adjust according to your expectations
-      stagesAction.removeAddToggleField(expect.anything()),
-      stagesAction.modifyStage(expect.anything()),
-      fieldErrorAction.getMandatoryFields(expect.arrayContaining([CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION_1])),
-      stagesAction.updateParentChildToggle(expect.anything()),
-      stagesAction.updateNatureOfEmployeeField(expect.anything())
     ];
 
-    const action = getFields(getStages, radioResidency, userInputs, {}, false);
-    action(mockDispatch);
+    it('should handle radioResidency updates for FINANCIAL_INSTITUTION', async () => {
+        const userInputs = {
+            applicants: [{
+                [CONSTANTS.LOGICAL_FIELD_NAMES.NATURE_OF_EMPLOYER]: 'Some value'
+            }]
+        };
+        
+        const expectedActions = [
+            // Define the expected actions dispatched
+            fieldErrorAction.getMandatoryFields([CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION_1]),
+            stagesAction.removeAddToggleField({
+                removeFields: [],
+                newFields: [CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION_1],
+                value: ''
+            }),
+            stagesAction.modifyStage({
+                fieldData: { 
+                    fieldName: CONSTANTS.LOGICAL_FIELD_NAMES.NATURE_OF_EMPLOYER,
+                    value: 'Some value', 
+                }
+            }),
+        ];
 
-    expectedActions.forEach(action => {
-      expect(mockDispatch).toHaveBeenCalledWith(action);
+        // Dispatch getField function
+        await store.dispatch(getFields(mockStages, { 
+            logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION,
+            value: '999' 
+        }, userInputs, {}, false));
+
+        const actions = store.getActions();
+        expect(actions).toEqual(expect.arrayContaining(expectedActions));
     });
-  });
 
-  it('should return null if no fields are found', () => {
-    const userInputs = {};
-    const getStages = [ { stageId: 'bd-3', stageInfo: {} } ];
-    const action = getFields(getStages, null, userInputs, {}, false);
+    it('should handle residency based changes', async () => {
+        const userInputs = {
+            applicants: [{
+                [CONSTANTS.LOGICAL_FIELD_NAMES.NATURE_OF_EMPLOYER]: 'Some value'
+            }]
+        };
+        
+        const radioResidency = {
+            logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1,
+            value: CONSTANTS.LOV_DATA.CHINESE_MAINLAND,
+        };
 
-    const result = action(mockDispatch);
+        const expectedActions = [
+            stagesAction.removeAddToggleField({
+                removeFields: [
+                    CONSTANTS.LOGICAL_FIELD_NAMES.STATE_RES_1, 
+                    // other fields...
+                ],
+                newFields: [],
+                value: ''
+            }),
+            fieldErrorAction.getMandatoryFields([/* expected fields */]),
+            // Other actions...
+        ];
 
-    expect(result).toBe(null);
-  });
+        await store.dispatch(getFields(mockStages, radioResidency, userInputs, {}, false));
 
-  // More tests can be added to cover different scenarios and inputs
+        const actions = store.getActions();
+        expect(actions).toEqual(expect.arrayContaining(expectedActions));
+    });
+
+    // ... you can write more tests for different conditions and scenarios
+
 });
