@@ -1,0 +1,90 @@
+import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import Model from './Model'; // Adjust the path to your actual Model component
+import '@testing-library/jest-dom/extend-expect';
+
+// Mock the necessary utils and assets
+jest.mock('../../../utils/model/common-model', () => ({
+  keyWithAnyModel: [
+    {
+      name: 'testModel',
+      header_content: 'Test Header',
+      body_content: ['Test Body part 1', 'Test Body part 2'],
+      buttons: ['Button 1', 'Button 2'],
+      // Add more mock data as needed
+    },
+  ],
+}));
+
+jest.mock('../../../assets/_json/model.json', () => ({
+  // Provide a similar structure as the real JSON file
+}));
+
+const mockProps = {
+  name: 'testModel',
+  handlebuttonClick: jest.fn(),
+  closepdf: jest.fn(),
+  agreePDF: jest.fn(),
+  data: {
+    target: {
+      title: 'Test PDF',
+      innerText: 'Download Test PDF'
+    }
+  }
+};
+
+describe('Model Component', () => {
+  test('renders popup content correctly', () => {
+    render(<Model {...mockProps} />);
+
+    expect(screen.getByText('Test Header')).toBeInTheDocument();
+    expect(screen.getByText('Test Body part 1')).toBeInTheDocument();
+    expect(screen.getByText('Button 1')).toBeInTheDocument();
+    expect(screen.getByText('Button 2')).toBeInTheDocument();
+  });
+
+  test('calls handlebuttonClick on button click', () => {
+    render(<Model {...mockProps} />);
+
+    fireEvent.click(screen.getByText('Button 1'));
+    expect(mockProps.handlebuttonClick).toHaveBeenCalled();
+  });
+
+  test('scrolling the PDF viewer shows/hides the agree button', () => {
+    render(<Model {...mockProps} />);
+    
+    const scrollButton = screen.getByText('Scroll');
+    
+    // Simulate scrolling
+    fireEvent.scroll(screen.getByText('Test Body part 1'), {
+      target: { scrollY: 100 },
+    });
+
+    // Check if the Agree button appears after scrolling
+    expect(screen.getByRole('button', { name: /Agree/i })).toBeInTheDocument();
+  });
+
+  test('download button triggers download', async () => {
+    render(<Model {...mockProps} />);
+
+    // Mock fetch
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        blob: () => Promise.resolve(new Blob(['dummy content'], { type: 'application/pdf' })),
+      })
+    );
+
+    fireEvent.click(screen.getByText('Download PDF'));
+
+    expect(global.fetch).toHaveBeenCalledWith('Test PDF');
+  });
+
+  test('closes success popup correctly', () => {
+    render(<Model {...mockProps} name="saveSuccess" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /close/i }));
+    expect(window.location.href).toContain(process.env.REACT_APP_HOME_PAGE_URL); // Adjust according to how the URL should change.
+  });
+
+  // Add more tests based on the other cases as needed
+});
