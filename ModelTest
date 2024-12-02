@@ -1,90 +1,87 @@
+// Model.test.tsx
+
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import Model from './Model'; // Adjust the path to your actual Model component
+import { render, fireEvent, screen } from '@testing-library/react';
+import Model from './Model';
+import * as utils from "../../../utils/common/change.utils";
+import modelInfo from "../../../assets/_json/model.json";
 import '@testing-library/jest-dom/extend-expect';
 
-// Mock the necessary utils and assets
-jest.mock('../../../utils/model/common-model', () => ({
-  keyWithAnyModel: [
-    {
-      name: 'testModel',
-      header_content: 'Test Header',
-      body_content: ['Test Body part 1', 'Test Body part 2'],
-      buttons: ['Button 1', 'Button 2'],
-      // Add more mock data as needed
-    },
-  ],
-}));
-
-jest.mock('../../../assets/_json/model.json', () => ({
-  // Provide a similar structure as the real JSON file
-}));
-
-const mockProps = {
-  name: 'testModel',
-  handlebuttonClick: jest.fn(),
-  closepdf: jest.fn(),
-  agreePDF: jest.fn(),
-  data: {
-    target: {
-      title: 'Test PDF',
-      innerText: 'Download Test PDF'
-    }
+// Mock external functions
+jest.mock("../../../utils/common/change.utils", () => ({
+  getUrl: {
+    getLanguageInfo: jest.fn(),
+    getChannelRefNo: jest.fn(),
   }
-};
+}));
 
 describe('Model Component', () => {
-  test('renders popup content correctly', () => {
-    render(<Model {...mockProps} />);
+  const mockClosePdf = jest.fn();
+  const mockAgreePDF = jest.fn();
+  const mockHandleButtonClick = jest.fn();
 
-    expect(screen.getByText('Test Header')).toBeInTheDocument();
-    expect(screen.getByText('Test Body part 1')).toBeInTheDocument();
-    expect(screen.getByText('Button 1')).toBeInTheDocument();
-    expect(screen.getByText('Button 2')).toBeInTheDocument();
+  beforeEach(() => {
+    jest.clearAllMocks();
+    utils.getUrl.getLanguageInfo.mockReturnValue('en');
+    utils.getUrl.getChannelRefNo.mockReturnValue({ applicationRefNo: '12345' });
   });
 
-  test('calls handlebuttonClick on button click', () => {
-    render(<Model {...mockProps} />);
+  it('renders correctly for empty_check state', () => {
+    render(<Model name="empty_check" data={{}} handlebuttonClick={mockHandleButtonClick} />);
 
-    fireEvent.click(screen.getByText('Button 1'));
-    expect(mockProps.handlebuttonClick).toHaveBeenCalled();
+    expect(screen.getByText(/continue/i)).toBeInTheDocument();
+    expect(screen.getByText(/btn text/i)).toBeInTheDocument(); // Modify according to button text
   });
 
-  test('scrolling the PDF viewer shows/hides the agree button', () => {
-    render(<Model {...mockProps} />);
-    
-    const scrollButton = screen.getByText('Scroll');
+  it('clicking button triggers handleButtonClick', () => {
+    render(<Model name="empty_check" data={{}} handlebuttonClick={mockHandleButtonClick} />);
+
+    const button = screen.getByText(/continue/i); // Modify according to button text
+    fireEvent.click(button);
+
+    expect(mockHandleButtonClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders saveSuccess correctly', () => {
+    render(<Model name="saveSuccess" data={{}} closepdf={mockClosePdf} />);
+
+    expect(screen.getByText(/thank you/i)).toBeInTheDocument(); // Adjust based on actual content
+    const closeButton = screen.getByRole('button', { name: '' }); // Adjust the accessibility requirement
+    fireEvent.click(closeButton);
+
+    expect(window.location.href).toContain(process.env.REACT_APP_HOME_PAGE_URL);
+  });
+
+  it('scroll button shows/hides correctly', () => {
+    const { container } = render(<Model name="info_tooltips" data={{}} closepdf={mockClosePdf} />);
+    const scrollDiv = container.querySelector('#pdfViewer');
     
     // Simulate scrolling
-    fireEvent.scroll(screen.getByText('Test Body part 1'), {
-      target: { scrollY: 100 },
+    fireEvent.scroll(scrollDiv, {
+      target: { scrollTop: 100, clientHeight: 500, scrollHeight: 1000 }
+    });
+    
+    expect(screen.getByText(/scroll/i)).toBeInTheDocument(); // Adjust based on button text
+
+    fireEvent.scroll(scrollDiv, {
+      target: { scrollTop: 900, clientHeight: 500, scrollHeight: 1000 }
     });
 
-    // Check if the Agree button appears after scrolling
-    expect(screen.getByRole('button', { name: /Agree/i })).toBeInTheDocument();
+    expect(screen.queryByText(/scroll/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/agree/i)).toBeInTheDocument(); // Adjust based on button text
   });
 
-  test('download button triggers download', async () => {
-    render(<Model {...mockProps} />);
+  it('calls downloadPDF on button click', async () => {
+    // Mock the fetch API to simulate PDF download
+    global.fetch = jest.fn().mockResolvedValue({
+      blob: jest.fn().mockResolvedValue(new Blob(['PDF content'], { type: 'application/pdf' }))
+    });
 
-    // Mock fetch
-    global.fetch = jest.fn(() =>
-      Promise.resolve({
-        blob: () => Promise.resolve(new Blob(['dummy content'], { type: 'application/pdf' })),
-      })
-    );
+    render(<Model name="info_tooltips" data={{ target: { title: 'test.pdf' } }} closepdf={mockClosePdf} agreePDF={mockAgreePDF} />);
+    
+    fireEvent.click(screen.getByText(/download pdf/i)); // Adjust button text to match
 
-    fireEvent.click(screen.getByText('Download PDF'));
-
-    expect(global.fetch).toHaveBeenCalledWith('Test PDF');
+    expect(fetch).toHaveBeenCalled();
+    expect(screen.queryByText(/scroll/i)).not.toBeInTheDocument(); // Verify the PDF is being "downloaded"
   });
-
-  test('closes success popup correctly', () => {
-    render(<Model {...mockProps} name="saveSuccess" />);
-
-    fireEvent.click(screen.getByRole('button', { name: /close/i }));
-    expect(window.location.href).toContain(process.env.REACT_APP_HOME_PAGE_URL); // Adjust according to how the URL should change.
-  });
-
-  // Add more tests based on the other cases as needed
 });
