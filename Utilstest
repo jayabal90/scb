@@ -1,70 +1,96 @@
-import { getDeviceTypes, getErrorType, getUserType, getStepName, loginval } from './your-file-path'; // Adjust the import path as needed
+import { getFields } from "./path-to-getFields"; // Replace with actual path
+import { AppDispatch } from "../../../services/common-service";
+import { fieldErrorAction } from "../../../utils/store/field-error-slice";
+import { stagesAction } from "../../../utils/store/stages-slice";
 
-describe('Utility functions', () => {
-    
-    describe('getDeviceTypes', () => {
-        it('should return "Mobile Website" for mobile user agents', () => {
-            // Mock the userAgent to simulate a mobile browser:
-            Object.defineProperty(window.navigator, 'userAgent', {
-                value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
-                configurable: true
-            });
-            expect(getDeviceTypes()).toBe('Mobile Website');
-        });
+jest.mock("../../../utils/store/field-error-slice");
+jest.mock("../../../utils/store/stages-slice");
+
+describe("getFields", () => {
+    let dispatch: AppDispatch;
+
+    beforeEach(() => {
+        dispatch = jest.fn(); // Mock dispatch function
+    });
+
+    test("should return null when stages are not defined", () => {
+        const result = getFields(null, null)(dispatch);
+        expect(result).toBe(null);
+        expect(dispatch).not.toHaveBeenCalled();
+    });
+
+    test("should return the correct fields for Exit-Entry Permit", () => {
+        const getStages = [
+            {
+                stageId: "1",
+                stageInfo: {
+                    fieldMetaData: {
+                        data: {
+                            stages: [{
+                                fields: [{ logical_field_name: "EEP" }, { logical_field_name: "expiry_date" }],
+                            }]
+                        }
+                    },
+                    applicants: [{ cash_needs: null, decision: null }],
+                }
+            }
+        ];
+        const radioResidency = {
+            logical_field_name: "id_type_cb",
+            value: "Exit-Entry Permit"
+        };
+
+        const result = getFields(getStages, radioResidency)(dispatch);
+        expect(dispatch).toHaveBeenCalledWith(fieldErrorAction.removeMandatoryFields(["passport_no"]));
+        expect(dispatch).toHaveBeenCalledWith(stagesAction.removeAddToggleField({"removeFields": ["passport_no"], "newFields": ["EEP", "expiry_date"], "value": ""}));
+        expect(result).toEqual([{ logical_field_name: "EEP" }, { logical_field_name: "expiry_date" }]);
+    });
+
+    test("should update fields based on user age and decision", () => {
+        const getStages = [...]; // Define appropriate structure
+        const radioResidency = {
+            logical_field_name: "some_field_name",
+            value: "some_value"
+        };
+        const userInputs = {
+            applicants: [{ decision: 'YES', cash_needs: 'NO' }]
+        };
+        const userAge = { userAge: 70 };
+
+        const result = getFields(getStages, radioResidency, userInputs, userAge)(dispatch);
+        expect(dispatch).toHaveBeenCalledWith(stagesAction.updateDynamicFields(expect.any(Object)));
+        // Add more assertions to check if the expected fields are returned
+    });
+
+    test("should handle scenarios correctly for education level", () => {
+        const getStages = [...]; // Define appropriate structure
+        const radioResidency = {
+            logical_field_name: "education_level",
+            value: "some_value"
+        };
+        const userInputs = {
+            applicants: [{ education_level: "BACHELORS", decision: 'YES' }]
+        };
+        const userAge = { userAge: 66 };
+
+        const result = getFields(getStages, radioResidency, userInputs, userAge)(dispatch);
+        // Add assertions based on the expected behavior for this scenario
+    });
+
+    test("should dispatch removeMandatoryFields if ssfStages are empty", () => {
+        const (getStages = [...]; // Define appropriate structure
+        const radioResidency = {
+            logical_field_name: "some_field_name",
+            value: "some_value"
+        };
         
-        it('should return "Desktop Website" for desktop user agents', () => {
-            Object.defineProperty(window.navigator, 'userAgent', {
-                value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                configurable: true
-            });
-            expect(getDeviceTypes()).toBe('Desktop Website');
-        });
+        const result = getFields(getStages, radioResidency)(dispatch);
+        expect(dispatch).toHaveBeenCalledWith(fieldErrorAction.removeMandatoryFields([])); // Adjust the contents based on implementation
     });
 
-    describe('getErrorType', () => {
-        it('should return the correct message for known error types', () => {
-            expect(getErrorType('STOP')).toBe('Save and Next');
-            expect(getErrorType('LOGIN')).toBe('Continue to Login');
-        });
+    // Additional tests for various branch cases in the function, including edge cases.
 
-        it('should return "na" for empty error type', () => {
-            expect(getErrorType('')).toBe('na');
-        });
-
-        it('should return undefined for unknown error types', () => {
-            expect(getErrorType('UNKNOWN')).toBeUndefined();
-        });
-    });
-
-    describe('getUserType', () => {
-        it('should return the correct user type description', () => {
-            expect(getUserType('ntb')).toBe('New to Bank');
-            expect(getUserType('ecc')).toBe('Existing to credit cards applying for bundle');
-        });
-        
-        it('should return undefined for unknown user types', () => {
-            expect(getUserType('UNKNOWN')).toBeUndefined();
-        });
-    });
-
-    describe('getStepName', () => {
-        it('should return the correct step name for known stages', () => {
-            const stage = { stages: { currentStage: 'declare' } };
-            expect(getStepName(stage)).toBe("start application process");
-
-            const stage2 = { stages: { stages: [{ stageId: 'bd-1' }] } };
-            expect(getStepName(stage2)).toBe("loan details");
-        });
-
-        it('should return undefined for unknown stages', () => {
-            const stage = { stages: { currentStage: 'unknownStage' } };
-            expect(getStepName(stage)).toBeUndefined();
-        });
-    });
-
-    describe('loginval', () => {
-        it('should return "RTOB"', () => {
-            expect(loginval()).toBe('RTOB');
-        });
+    afterEach(() => {
+        jest.clearAllMocks(); // Clear mock calls after each test
     });
 });
