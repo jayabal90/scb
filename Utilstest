@@ -1,0 +1,70 @@
+import { getDeviceTypes, getErrorType, getUserType, getStepName, loginval } from './your-file-path'; // Adjust the import path as needed
+
+describe('Utility functions', () => {
+    
+    describe('getDeviceTypes', () => {
+        it('should return "Mobile Website" for mobile user agents', () => {
+            // Mock the userAgent to simulate a mobile browser:
+            Object.defineProperty(window.navigator, 'userAgent', {
+                value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
+                configurable: true
+            });
+            expect(getDeviceTypes()).toBe('Mobile Website');
+        });
+        
+        it('should return "Desktop Website" for desktop user agents', () => {
+            Object.defineProperty(window.navigator, 'userAgent', {
+                value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                configurable: true
+            });
+            expect(getDeviceTypes()).toBe('Desktop Website');
+        });
+    });
+
+    describe('getErrorType', () => {
+        it('should return the correct message for known error types', () => {
+            expect(getErrorType('STOP')).toBe('Save and Next');
+            expect(getErrorType('LOGIN')).toBe('Continue to Login');
+        });
+
+        it('should return "na" for empty error type', () => {
+            expect(getErrorType('')).toBe('na');
+        });
+
+        it('should return undefined for unknown error types', () => {
+            expect(getErrorType('UNKNOWN')).toBeUndefined();
+        });
+    });
+
+    describe('getUserType', () => {
+        it('should return the correct user type description', () => {
+            expect(getUserType('ntb')).toBe('New to Bank');
+            expect(getUserType('ecc')).toBe('Existing to credit cards applying for bundle');
+        });
+        
+        it('should return undefined for unknown user types', () => {
+            expect(getUserType('UNKNOWN')).toBeUndefined();
+        });
+    });
+
+    describe('getStepName', () => {
+        it('should return the correct step name for known stages', () => {
+            const stage = { stages: { currentStage: 'declare' } };
+            expect(getStepName(stage)).toBe("start application process");
+
+            const stage2 = { stages: { stages: [{ stageId: 'bd-1' }] } };
+            expect(getStepName(stage2)).toBe("loan details");
+        });
+
+        it('should return undefined for unknown stages', () => {
+            const stage = { stages: { currentStage: 'unknownStage' } };
+            expect(getStepName(stage)).toBeUndefined();
+        });
+    });
+
+    describe('loginval', () => {
+        it('should return "RTOB"', () => {
+            expect(loginval()).toBe('RTOB');
+        });
+    });
+});
