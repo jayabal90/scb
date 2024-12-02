@@ -1,0 +1,108 @@
+import React from "react";
+import { render, fireEvent } from "@testing-library/react";
+import { useDispatch, useSelector } from "react-redux";
+import Text from "./Text";
+import { CONSTANTS } from "../../../utils/common/constants";
+
+// Mock redux hooks
+jest.mock("react-redux", () => ({
+  useDispatch: jest.fn(),
+  useSelector: jest.fn(),
+}));
+
+describe("Text Component", () => {
+  let mockDispatch: jest.Mock;
+
+  const mockData = {
+    logical_field_name: "test_field",
+    ui_defaulted_value: "default value",
+    rwb_label_name: "Test Label",
+    mandatory: "Yes",
+    min_length: 2,
+    type: "text",
+  };
+
+  beforeEach(() => {
+    mockDispatch = jest.fn();
+    (useDispatch as jest.Mock).mockReturnValue(mockDispatch);
+
+    (useSelector as jest.Mock).mockImplementation((selectorFn) => {
+      if (selectorFn.name === "storeModel") {
+        return {
+          stages: {
+            stages: [{ stageId: CONSTANTS.STAGE_NAMES.AD_3 }],
+            userInput: { applicants: [{ test_field: "" }] },
+          },
+          fielderror: { error: false },
+        };
+      }
+      return {};
+    });
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test("should render without crashing", () => {
+    const { getByLabelText } = render(<Text data={mockData} handleCallback={jest.fn()} />);
+    
+    const inputField = getByLabelText(mockData.logical_field_name);
+    expect(inputField).toBeInTheDocument();
+    expect(inputField).toHaveValue(mockData.ui_defaulted_value);
+  });
+
+  test("should display error when mandatory field is empty", () => {
+    const { getByLabelText, getByText } = render(<Text data={mockData} handleCallback={jest.fn()} />);
+    
+    const inputField = getByLabelText(mockData.logical_field_name);
+    
+    // Trigger blur event to check for errors (change the implementation if needed)
+    fireEvent.blur(inputField);
+    
+    expect(getByText(/required/i)).toBeInTheDocument(); // Assuming this text is in the error message
+  });
+
+  test("should call handleCallback on input change", () => {
+    const handleCallbackMock = jest.fn();
+    const { getByLabelText } = render(<Text data={mockData} handleCallback={handleCallbackMock} />);
+    
+    const inputField = getByLabelText(mockData.logical_field_name);
+    fireEvent.change(inputField, { target: { value: "new value" } });
+    
+    expect(handleCallbackMock).toHaveBeenCalledWith(mockData, "new value");
+    expect(mockDispatch).toHaveBeenCalled(); // Assuming dispatch is called in changeHandler
+  });
+
+  test("should disable the input when textDisabled is true", () => {
+    (useSelector as jest.Mock).mockImplementation((selectorFn) => {
+      if (selectorFn.name === "storeModel") {
+        return {
+          stages: {
+            stages: [{ stageId: CONSTANTS.STAGE_NAMES.AD_3 }],
+            userInput: { applicants: [{ test_field: "" }] },
+            pinyinToggle: true // Assume pinyinToggle is true to disable the input
+          },
+          fielderror: { error: false },
+        };
+      }
+      return {};
+    });
+
+    const { getByLabelText } = render(<Text data={mockData} handleCallback={jest.fn()} />);
+    
+    const inputField = getByLabelText(mockData.logical_field_name);
+    expect(inputField).toBeDisabled();
+  });
+
+  test("should display error messages for invalid inputs", () => {
+    const { getByLabelText, getByText } = render(<Text data={mockData} handleCallback={jest.fn()} />);
+    
+    const inputField = getByLabelText(mockData.logical_field_name);
+    
+    fireEvent.change(inputField, { target: { value: " " } });
+    fireEvent.blur(inputField);
+    
+    expect(getByText(/patterns/i)).toBeInTheDocument(); // Assuming the error message contains "patterns"
+  });
+});
