@@ -1,0 +1,88 @@
+import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import configureStore from 'redux-mock-store';
+import OTPModel from './OTPModel'; // Adjust the import according to the file structure
+import * as redux from 'react-redux';
+
+const mockStore = configureStore([]);
+
+jest.mock('react-redux');
+
+describe('OTPModel Component', () => {
+  let store;
+
+  beforeEach(() => {
+    store = mockStore({
+      stages: {
+        stages: [{}],
+        userInput: {
+          applicants: [{ mobile_number: '+852-88389099' }]
+        },
+        journeyType: 'testJourney',
+      },
+      lov: {},
+      valueUpdate: {},
+      error: {},
+      auth: {
+        sessionUid: 'some-session-id',
+      },
+      preApproval: {
+        formConfigmetaData: {
+          application: { channel_reference: '12345' },
+          products: [{}],
+        },
+        otpData: {},
+        randomChallengeData: {},
+      },
+      model: {
+        toggleModel: true
+      }
+    });
+
+    redux.useSelector.mockImplementation(callback => callback(store.getState()));
+    redux.useDispatch.mockReturnValue(jest.fn());
+  });
+
+  test('renders OTPModel component', () => {
+    render(
+      <Provider store={store}>
+        <OTPModel />
+      </Provider>
+    );
+
+    expect(screen.getByText(/Enter the 6-digit code sent to/i)).toBeInTheDocument();
+  });
+
+  test('handles OTP input and submission', async () => {
+    render(
+      <Provider store={store}>
+        <OTPModel />
+      </Provider>
+    );
+
+    const otpInputs = await screen.findAllByRole('textbox');
+
+    // Simulate typing in OTP inputs
+    otpInputs.forEach((input, index) => {
+      fireEvent.change(input, { target: { value: String(index + 1) } });
+      if (index < otpInputs.length - 1) {
+        fireEvent.keyUp(input, { key: 'ArrowRight' });
+      }
+    });
+
+    // Assuming there is a way to submit the OTP after filling it
+    // You might need to find the button for submission and click it
+    // e.g.
+    // fireEvent.click(screen.getByRole('button', { name: /submit/i }));
+
+    // Validate if some expected change occurs, e.g., navigation occurs or a message gets displayed
+    // await waitFor(() => expect(someCondition).toBeTruthy());
+  });
+
+  // Add more test cases as needed for various functionalities
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+});
