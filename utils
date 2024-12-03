@@ -1,102 +1,66 @@
-import { KeyWithAnyModel } from "../model/common-model";
+import { AppDispatch } from "../../../services/common-service";
+import { FindIndex } from "../../../utils/common/change.utils";
+import { KeyWithAnyModel, StageDetails } from "../../../utils/model/common-model";
+import { taxStoreModel } from "../../../utils/model/common-model"
 
-/**
- * Method to get device type
- */
-export const getDeviceTypes = () => {
-    let device = "Desktop Website";
-    let userAgent = window.navigator.userAgent.toLowerCase();
-    if (
-      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-        userAgent
-      )
-    ) {
-      return (device = "Mobile Website");
-    }
-    return device;
-  };
 
-export const getErrorType = (errorType: string) => {
-    let errorTypeList: KeyWithAnyModel = {
-        '': 'na',
-        'STOP': 'Save and Next',
-        'CONTINUE': 'Try Again',
-        'RESUBMIT': 'Review',
-        'CORRECT': 'Review',
-        'LOGIN': 'Continue to Login',
-        'ROSHAN_CONTINUE': 'Ok, Continue'
-    }
-    return errorTypeList[errorType];
- }
+export const getFields = (getStages: Array<StageDetails>, taxSelector: taxStoreModel, action: string): any => {
+    return (dispatch: AppDispatch) => {
+        let fields: Array<KeyWithAnyModel> | undefined;
 
-export const getUserType = (userType: string) => {
-    let userTypeLIst: KeyWithAnyModel = {
-        'ntb': 'New to Bank',
-        'etb': 'Existing to Bank',
-        'etc': 'Existing to cards or casa',
-        'ntc': 'New to cards or casa',
-        'ecc': 'Existing to credit cards applying for bundle',
-        'c01': 'Non resident of SG',
-        'eca': 'Existing to casa applying for bundle',
-        'mdd': 'Multiple dedupe',
-        'NTB': 'New to Bank',
-        'ETB': 'Existing to Bank',
-        'ETC': 'Existing to CC and PL',
-        'ETP': 'Existing to CC and PL',
-        'NTC': 'New to cards or casa'
+        const stageId = getStages[0] && getStages[0].stageId;
+        const stageIndex = FindIndex(getStages[0] && getStages[0].stageInfo, stageId);
+        fields = getStages[0] && getStages[0].stageInfo.fieldMetaData.data.stages[stageIndex].fields;
+        let newFileds: Array<KeyWithAnyModel> = [];
+
+        let getClonedField = (logical_field_name: string) => {
+            if (fields) {
+                let field = fields.find(field => field.logical_field_name === logical_field_name);
+                if (field && field.logical_field_name) {
+                    return { ...field };
+                } else {
+                    return null;
+                }
+            } else {
+                return null;
+            }
+        }
+
+        let country_of_tax_residence = getClonedField('country_of_tax_residence');
+        let tax_id_no = getClonedField('tax_id_no');
+
+        const getSequence = () => {
+            for (let i = 1; i <= taxSelector.maxCount; i++) {
+                let isItemFound = false;
+                taxSelector.fields.forEach((field: string, index: number) => {
+                    if (
+                        field &&
+                        field.split("_")[4] === i.toString() &&
+                        index % 2 === 0
+                    ) {
+                        isItemFound = true;
+                    }
+                });
+                if (!isItemFound) {
+                    return i;
+                }
+            }
+        };
+
+        taxSelector && taxSelector.fields && taxSelector.fields.forEach((field: string) => {
+            if (
+                field &&
+                field.split("_")[0] === "country" &&
+                country_of_tax_residence
+            ) {
+                country_of_tax_residence.logical_field_name = field;
+                newFileds.push({ ...country_of_tax_residence });
+            } else if (field.split("_")[0] === "tax" && tax_id_no) {
+                tax_id_no.logical_field_name = field;
+                newFileds.push({ ...tax_id_no });
+            }
+        });
+
+        return newFileds;
     }
-    return userTypeLIst[userType];
 }
-
-export const getStepName = (stage: KeyWithAnyModel) => {
-    const stageID = stage.stages.currentStage ?  stage.stages.currentStage.toLowerCase() : stage.stages.stages[0].stageId.toLowerCase();
-    let stepName;
-    switch(stageID) {
-        case 'declare':
-            stepName = "start application process";
-            break;
-        case 'pd-1':
-            stepName = "personal details";
-            break;
-        case 'bd-1a':
-            stepName = "loan details";
-            break;
-        case 'bd-1':
-            stepName = "loan details";
-            break;
-        case 'ssf-1':
-            stepName = "let's get started !";
-            break;
-        case 'bd-2':
-            stepName = "partner bank details";
-            break;
-        case 'bd-3':
-            stepName = "eligibility assessment";
-            break;
-        case 'bd-4':
-            stepName = "personal details";
-            break;
-        case 'bd-5':
-            stepName = "continue personal details";
-            break;
-        case 'ad-1':
-            stepName = "tax information";
-            break;
-        case 'ad-3':
-            stepName = "create your online banking login details";
-            break;
-        case 'ad-2':
-            stepName = "preferences for account";
-            break;
-        case 'rp':
-            stepName = "review and confirm";
-            break;
-    }
-    return stepName;
-}
-
-
-export const loginval = () => {
-        return 'RTOB';
-}
-
