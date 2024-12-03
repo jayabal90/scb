@@ -1,111 +1,88 @@
-import { getFields } from './path-to-your-getFields-file'; // Adjust the import path as necessary
-import configureMockStore from 'redux-mock-store';
+import configureStore from 'redux-mock-store';
+import { AppDispatch } from '../../../services/common-service';
+import { getFields } from './yourModulePath'; // Adjust according to your file structure
+import { fieldErrorAction } from '../../../utils/store/field-error-slice';
+import { stagesAction } from '../../../utils/store/stages-slice';
 import thunk from 'redux-thunk';
-import { AppDispatch } from "../../../services/common-service"; // Adjust the import path as necessary
+import { CONSTANTS } from '../../../utils/common/constants';
 
 const middlewares = [thunk];
-const mockStore = configureMockStore(middlewares);
+const mockStore = configureStore(middlewares);
 
-describe('getFields', () => {
-    let store;
+let store;
 
-    beforeEach(() => {
-        store = mockStore({ /* initial state if needed */ });
+beforeEach(() => {
+    store = mockStore({
+        fieldError: {},
+        stages: {},
     });
+});
 
-    it('should return new fields for valid input', async () => {
-        const getStages = [
+test('should dispatch fieldErrorAction and stagesAction correctly', () => {
+    const getStages = [
+        {
+            stageId: 'bd-5',
+            stageInfo: {
+                fieldMetaData: {
+                    data: {
+                        stages: [
+                            {
+                                fields: [
+                                    { logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE },
+                                    { logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION },
+                                    { logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT },
+                                    { logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE },
+                                ],
+                            },
+                        ],
+                    },
+                },
+                applicants: [
+                    {
+                        cash_needs: CONSTANTS.LOV_DATA.YES,
+                        decision: CONSTANTS.LOV_DATA.NO,
+                        education_level: 'some_education_level',
+                        investment_experience: CONSTANTS.LOV_DATA.YES,
+                    },
+                ],
+            },
+        },
+    ];
+
+    const radioResidency = {
+        logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE,
+        value: CONSTANTS.LOV_DATA.YES,
+    };
+
+    const userInputs = {
+        applicants: [
             {
-                stageId: 'stage1',
-                stageInfo: {
-                    fieldMetaData: {
-                        data: {
-                            stages: [
-                                {
-                                    fields: [
-                                        { logical_field_name: 'country_of_tax_residence' },
-                                        { logical_field_name: 'tax_id_no' }
-                                    ]
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        ];
+                investment_experience: CONSTANTS.LOV_DATA.YES,
+            },
+        ],
+    };
 
-        const taxSelector = {
-            maxCount: 3,
-            fields: ['country_1', 'tax_1']
-        };
+    const userAge = { userAge: 30 };
+    const dynamicFieldSelector = {};
+    const parentChildToggleSelector = { resFields: [] };
 
-        const result = await store.dispatch(getFields(getStages, taxSelector, 'someAction'));
+    const expectedActions = [
+        // Ensure these actions match what your application should dispatch.
+        // Add your expected actions here from `fieldErrorAction` and `stagesAction`.
+    ];
 
-        expect(result).toEqual([
-            { logical_field_name: 'country_1' },
-            { logical_field_name: 'tax_1' }
-        ]);
-    });
+    const expectedStageComponents = [
+        // Expected stage components based on the test scenario.
+    ];
 
-    it('should handle missing fields gracefully', async () => {
-        const getStages = [
-            {
-                stageId: 'stage1',
-                stageInfo: {
-                    fieldMetaData: {
-                        data: {
-                            stages: [
-                                {
-                                    fields: []
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        ];
+    return store.dispatch(getFields(getStages, radioResidency, userInputs, userAge, dynamicFieldSelector, parentChildToggleSelector))
+        .then(() => {
+            const actions = store.getActions();
 
-        const taxSelector = {
-            maxCount: 3,
-            fields: []
-        };
+            // Check that the expected actions were dispatched
+            expect(actions).toEqual(expectedActions);
 
-        const result = await store.dispatch(getFields(getStages, taxSelector, 'someAction'));
-
-        expect(result).toEqual([]);
-    });
-
-    it('should return new fields with sequence creation', async () => {
-        const getStages = [
-            {
-                stageId: 'stage1',
-                stageInfo: {
-                    fieldMetaData: {
-                        data: {
-                            stages: [
-                                {
-                                    fields: [
-                                        { logical_field_name: 'country_of_tax_residence' },
-                                        { logical_field_name: 'tax_id_no' }
-                                    ]
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        ];
-
-        const taxSelector = {
-            maxCount: 3,
-            fields: ['country_1', 'tax_1', 'country_2']
-        };
-
-        const result = await store.dispatch(getFields(getStages, taxSelector, 'someAction'));
-
-        expect(result).toEqual([
-            { logical_field_name: 'country_2' },
-            { logical_field_name: 'tax_2' }
-        ]);
-    });
+            // You can also test the returned value (stage components)
+            expect(expectedStageComponents).toEqual(stageComponents); // Adjust accordingly
+        });
 });
