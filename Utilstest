@@ -1,101 +1,111 @@
-import { stageFields, userInputPayload, stageSelectFields } from './path/to/your/module'; 
-import { stagesAction } from "../../../utils/store/stages-slice";
-import configureStore from 'redux-mock-store';
-import { render } from '@testing-library/react';
+import { getFields } from './path-to-your-getFields-file'; // Adjust the import path as necessary
+import configureMockStore from 'redux-mock-store';
 import thunk from 'redux-thunk';
+import { AppDispatch } from "../../../services/common-service"; // Adjust the import path as necessary
 
-// Setup Redux mock store
 const middlewares = [thunk];
-const mockStore = configureStore(middlewares);
+const mockStore = configureMockStore(middlewares);
 
-describe('Stage Utility Functions', () => {
-  let store;
+describe('getFields', () => {
+    let store;
 
-  beforeEach(() => {
-    store = mockStore({
-      stages: {
-        // initial state if needed
-      }
+    beforeEach(() => {
+        store = mockStore({ /* initial state if needed */ });
     });
-  });
 
-  test('stageFields should correctly group fields based on stageId', () => {
-    const stageSelector = [{
-      stageInfo: {
-        fieldMetaData: {
-          data: {
-            stages: [
-              {
-                fields: [
-                  { logical_field_name: 'field1', rwb_category: 'bd-1' },
-                  { logical_field_name: 'field2', rwb_category: 'bd-1' },
-                ]
-              }
-            ]
-          }
-        },
-        application: 'dummy_application'
-      }
-    }];
-    
-    const result = stageFields(stageSelector, 'bd-1');
-    
-    expect(result.fields).toBeDefined();
-    expect(result.fields.length).toBeGreaterThan(0); // Make assertions about the expected structure
-  });
-
-  test('stageSelectFields should return fields based on input stageSelector', () => {
-    const stageSelector = [{
-      stageInfo: {
-        fieldMetaData: {
-          data: {
-            stages: [
-              {
-                fields: [
-                  { logical_field_name: 'field1', rwb_category: 'bd-2' },
-                ]
-              }
-            ]
-          }
-        },
-        application: 'dummy_application'
-      }
-    }];
-
-    const result = stageSelectFields(stageSelector, 'bd-2');
-    
-    expect(result.fields).toBeDefined();
-    expect(result.fields.length).toEqual(1); // Expecting one field based on our defined input
-  });
-
-  test('userInputPayload should dispatch the correct actions', async () => {
-    const applicantsSelector = {
-      field1: 'value1',
-      field2: 'value2',
-      // Add more fields as necessary
-    };
-    
-    const stageSelector = [
-      {
-        stageInfo: {
-          applicants: [
+    it('should return new fields for valid input', async () => {
+        const getStages = [
             {
-              field1_a_1: '',
-              field2_a_1: ''
+                stageId: 'stage1',
+                stageInfo: {
+                    fieldMetaData: {
+                        data: {
+                            stages: [
+                                {
+                                    fields: [
+                                        { logical_field_name: 'country_of_tax_residence' },
+                                        { logical_field_name: 'tax_id_no' }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
             }
-          ]
-        }
-      }
-    ];
-    
-    const expectedActions = [
-      stagesAction.updateStageFields(expect.any(Object)) // Expect return action type
-    ];
-    
-    store.dispatch(userInputPayload(applicantsSelector, stageSelector));
-    
-    const actions = store.getActions();
-    
-    expect(actions).toEqual(expectedActions);
-  });
+        ];
+
+        const taxSelector = {
+            maxCount: 3,
+            fields: ['country_1', 'tax_1']
+        };
+
+        const result = await store.dispatch(getFields(getStages, taxSelector, 'someAction'));
+
+        expect(result).toEqual([
+            { logical_field_name: 'country_1' },
+            { logical_field_name: 'tax_1' }
+        ]);
+    });
+
+    it('should handle missing fields gracefully', async () => {
+        const getStages = [
+            {
+                stageId: 'stage1',
+                stageInfo: {
+                    fieldMetaData: {
+                        data: {
+                            stages: [
+                                {
+                                    fields: []
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        ];
+
+        const taxSelector = {
+            maxCount: 3,
+            fields: []
+        };
+
+        const result = await store.dispatch(getFields(getStages, taxSelector, 'someAction'));
+
+        expect(result).toEqual([]);
+    });
+
+    it('should return new fields with sequence creation', async () => {
+        const getStages = [
+            {
+                stageId: 'stage1',
+                stageInfo: {
+                    fieldMetaData: {
+                        data: {
+                            stages: [
+                                {
+                                    fields: [
+                                        { logical_field_name: 'country_of_tax_residence' },
+                                        { logical_field_name: 'tax_id_no' }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        ];
+
+        const taxSelector = {
+            maxCount: 3,
+            fields: ['country_1', 'tax_1', 'country_2']
+        };
+
+        const result = await store.dispatch(getFields(getStages, taxSelector, 'someAction'));
+
+        expect(result).toEqual([
+            { logical_field_name: 'country_2' },
+            { logical_field_name: 'tax_2' }
+        ]);
+    });
 });
