@@ -1,88 +1,75 @@
+import React from 'react';
+import { render } from '@testing-library/react';
+import { Provider } from 'react-redux';
 import configureStore from 'redux-mock-store';
-import { AppDispatch } from '../../../services/common-service';
-import { getFields } from './yourModulePath'; // Adjust according to your file structure
-import { fieldErrorAction } from '../../../utils/store/field-error-slice';
-import { stagesAction } from '../../../utils/store/stages-slice';
-import thunk from 'redux-thunk';
-import { CONSTANTS } from '../../../utils/common/constants';
+import { getFields } from './path/to/your/action/file';  // Adjust the import path
+import { CONSTANTS } from "../../../utils/common/constants";
+import { getLovData } from '../../../services/common-service'; // If necessary to mock
 
-const middlewares = [thunk];
-const mockStore = configureStore(middlewares);
+jest.mock('../../../services/common-service', () => ({
+    getLovData: jest.fn(),
+}));
 
-let store;
+const mockStore = configureStore();
+const store = mockStore({});
 
-beforeEach(() => {
-    store = mockStore({
-        fieldError: {},
-        stages: {},
+describe('getFields action', () => {
+    // Mock the dispatch function
+    let dispatch;
+
+    beforeEach(() => {
+        dispatch = jest.fn();
     });
-});
 
-test('should dispatch fieldErrorAction and stagesAction correctly', () => {
-    const getStages = [
-        {
-            stageId: 'bd-5',
+    it('should dispatch appropriate actions based on radioResidency input', () => {
+        const userInputs = {
+            applicants: [{
+                investment_experience: CONSTANTS.LOV_DATA.YES,
+                cash_needs: CONSTANTS.LOV_DATA.YES,
+                decision: CONSTANTS.LOV_DATA.YES,
+            }],
+        };
+
+        const getStages = [{ 
+            stageId: 'bd-5', 
             stageInfo: {
                 fieldMetaData: {
                     data: {
                         stages: [
-                            {
-                                fields: [
-                                    { logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE },
-                                    { logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION },
-                                    { logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT },
-                                    { logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE },
-                                ],
-                            },
+                            { fields: [{ logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE }] },
                         ],
                     },
-                },
-                applicants: [
-                    {
-                        cash_needs: CONSTANTS.LOV_DATA.YES,
-                        decision: CONSTANTS.LOV_DATA.NO,
-                        education_level: 'some_education_level',
-                        investment_experience: CONSTANTS.LOV_DATA.YES,
-                    },
-                ],
-            },
-        },
-    ];
+                }, 
+                applicants: [{ 
+                    investment_experience: CONSTANTS.LOV_DATA.YES,
+                    cash_needs: CONSTANTS.LOV_DATA.YES,
+                    decision: CONSTANTS.LOV_DATA.YES,
+                }] 
+            }
+        }];
+        
+        const radioResidency = { 
+            logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE, 
+            value: CONSTANTS.LOV_DATA.YES 
+        };
 
-    const radioResidency = {
-        logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE,
-        value: CONSTANTS.LOV_DATA.YES,
-    };
+        const userAge = { userAge: 30 };
+        const dynamicFieldSelector = {};
+        const parentChildToggleSelector = { resFields: [] };
 
-    const userInputs = {
-        applicants: [
-            {
-                investment_experience: CONSTANTS.LOV_DATA.YES,
-            },
-        ],
-    };
+        // Call the action
+        const action = getFields(getStages, radioResidency, userInputs, userAge, dynamicFieldSelector, parentChildToggleSelector);
+        action(dispatch); // You'll need to simulate an async dispatch if your action is async.
 
-    const userAge = { userAge: 30 };
-    const dynamicFieldSelector = {};
-    const parentChildToggleSelector = { resFields: [] };
-
-    const expectedActions = [
-        // Ensure these actions match what your application should dispatch.
-        // Add your expected actions here from `fieldErrorAction` and `stagesAction`.
-    ];
-
-    const expectedStageComponents = [
-        // Expected stage components based on the test scenario.
-    ];
-
-    return store.dispatch(getFields(getStages, radioResidency, userInputs, userAge, dynamicFieldSelector, parentChildToggleSelector))
-        .then(() => {
-            const actions = store.getActions();
-
-            // Check that the expected actions were dispatched
-            expect(actions).toEqual(expectedActions);
-
-            // You can also test the returned value (stage components)
-            expect(expectedStageComponents).toEqual(stageComponents); // Adjust accordingly
+        // Now assert that the right actions were dispatched
+        expect(dispatch).toHaveBeenCalledWith(expect.any(Function)); // Check for the first dispatch
+        
+        // Further assertions can be performed based on the state changes and dispatches you expect
+        expect(dispatch).toHaveBeenCalledWith({
+            type: 'fieldError/removeMandatoryFields', // Adjust this based on your actual action type
+            payload: expect.any(Array), // Look for an array or whatever the expected payload is
         });
+        
+        expect(getLovData).toHaveBeenCalledWith(CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE);
+    });
 });
