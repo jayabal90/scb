@@ -1,72 +1,101 @@
-import { getFields } from './path/to/your/getFields'; // Adjust the import path accordingly
-import { fieldErrorAction } from '../../../utils/store/field-error-slice';
-import { stagesAction } from '../../../utils/store/stages-slice';
+import { stageFields, userInputPayload, stageSelectFields } from './path/to/your/module'; 
+import { stagesAction } from "../../../utils/store/stages-slice";
 import configureStore from 'redux-mock-store';
+import { render } from '@testing-library/react';
 import thunk from 'redux-thunk';
-import { CONSTANTS } from '../../../utils/common/constants';
 
+// Setup Redux mock store
 const middlewares = [thunk];
 const mockStore = configureStore(middlewares);
 
-describe('getFields', () => {
-    let store;
-    let dispatch;
+describe('Stage Utility Functions', () => {
+  let store;
 
-    beforeEach(() => {
-        store = mockStore({});
-        dispatch = jest.fn();
+  beforeEach(() => {
+    store = mockStore({
+      stages: {
+        // initial state if needed
+      }
     });
+  });
 
-    it('should dispatch removeAddToggleFieldFn correctly when residency is present', () => {
-        const getStages = [{
-            stageId: 'sample-stage-id',
-            stageInfo: {
-                fieldMetaData: {
-                    data: {
-                        stages: [
-                            {
-                                fields: [
-                                    { logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE },
-                                    { logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION }
-                                ]
-                            }
-                        ]
-                    }
-                },
-                applicants: [{ cash_needs: 'YES', education_level: 'HIGH' }]
+  test('stageFields should correctly group fields based on stageId', () => {
+    const stageSelector = [{
+      stageInfo: {
+        fieldMetaData: {
+          data: {
+            stages: [
+              {
+                fields: [
+                  { logical_field_name: 'field1', rwb_category: 'bd-1' },
+                  { logical_field_name: 'field2', rwb_category: 'bd-1' },
+                ]
+              }
+            ]
+          }
+        },
+        application: 'dummy_application'
+      }
+    }];
+    
+    const result = stageFields(stageSelector, 'bd-1');
+    
+    expect(result.fields).toBeDefined();
+    expect(result.fields.length).toBeGreaterThan(0); // Make assertions about the expected structure
+  });
+
+  test('stageSelectFields should return fields based on input stageSelector', () => {
+    const stageSelector = [{
+      stageInfo: {
+        fieldMetaData: {
+          data: {
+            stages: [
+              {
+                fields: [
+                  { logical_field_name: 'field1', rwb_category: 'bd-2' },
+                ]
+              }
+            ]
+          }
+        },
+        application: 'dummy_application'
+      }
+    }];
+
+    const result = stageSelectFields(stageSelector, 'bd-2');
+    
+    expect(result.fields).toBeDefined();
+    expect(result.fields.length).toEqual(1); // Expecting one field based on our defined input
+  });
+
+  test('userInputPayload should dispatch the correct actions', async () => {
+    const applicantsSelector = {
+      field1: 'value1',
+      field2: 'value2',
+      // Add more fields as necessary
+    };
+    
+    const stageSelector = [
+      {
+        stageInfo: {
+          applicants: [
+            {
+              field1_a_1: '',
+              field2_a_1: ''
             }
-        }];
-
-        const radioResidency = { logical_field_name: 'id_type_cb', value: 'Exit-Entry Permit' };
-        const userInputs = { applicants: [{ investment_experience: 'YES' }] };
-        
-        const expectedActions = [
-            fieldErrorAction.removeMandatoryFields(['passport_no']),
-            stagesAction.removeAddToggleField({ removeFields: ['passport_no'], newFields: ['EEP', 'expiry_date'], value: '' }),
-            // Add more expected actions based on your logic
-        ];
-
-        const result = getFields(getStages, radioResidency, userInputs)(dispatch);
-
-        expect(dispatch).toHaveBeenCalledTimes(expectedActions.length);
-        expectedActions.forEach(action => expect(dispatch).toHaveBeenCalledWith(action));
-    });
-
-    // Add other test cases as needed
-    it('should return null if getStages is empty', () => {
-        const result = getFields([], null)(dispatch);
-        expect(result).toBe(null);
-    });
-
-    it('should handle investment experience correctly', () => {
-        const getStages = [/* Your mock stages data here */];
-        const radioResidency = { logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE, value: 'YES' };
-        const userInputs = { applicants: [{ investment_experience: 'YES' }] };
-
-        getFields(getStages, radioResidency, userInputs)(dispatch);
-
-        // Assert on the actions that should be dispatched
-    });
-
-    // Other test cases should follow the pattern above.
+          ]
+        }
+      }
+    ];
+    
+    const expectedActions = [
+      stagesAction.updateStageFields(expect.any(Object)) // Expect return action type
+    ];
+    
+    store.dispatch(userInputPayload(applicantsSelector, stageSelector));
+    
+    const actions = store.getActions();
+    
+    expect(actions).toEqual(expectedActions);
+  });
 });
