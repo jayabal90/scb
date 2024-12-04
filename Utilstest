@@ -1,67 +1,44 @@
-import rulesUtils from './path/to/rulesUtils'; // adjust the import path as necessary
-import { FieldsetModel, KeyWithAnyModel } from '../../utils/model/common-model';
+// encrypt.test.js
+import encrypt from './path_to_your_encrypt_function'; // Update this path accordingly
 
-describe('rulesUtils function', () => {
-    it('should mark fields as editable based on nonEditable list', () => {
-        const props: Array<Array<FieldsetModel>> = [
-            [{
-                logical_field_name: 'field1',
-                fields: [{ logical_field_name: 'fieldA' }, { logical_field_name: 'fieldB' }]
-            }]
-        ];
-        const validationObj = {
-            nonEditable: [['fieldB']]
-        };
+describe('RSA Encryption Tests', () => {
+    const exp = '010001'; // Example public exponent (should be in hex format)
+    const mod = 'AC3138F108C4048F4BB600E419B9E3693E661F0DD76EA165D62D5CFA1BECF9A8'; // Example modulus (hex format)
+    const nonce = '0123456789ABCDEF'; // Example nonce (or padding)
+    const plain = 'Hello, World!'; // The plaintext to be encrypted
 
-        const result = rulesUtils(props, validationObj);
-
-        expect(result[0].fields[0].editable).toBe(false); // fieldA should be editable
-        expect(result[0].fields[1].editable).toBe(true);  // fieldB should not be editable
-    });
-
-    it('should set default_visibility to null for specific fields', () => {
-        const props: Array<Array<FieldsetModel>> = [
-            [{
-                logical_field_name: 'field1',
-                fields: [{ logical_field_name: 'monthly_installment_mortgage_payment' }]
-            }]
-        ];
-        const validationObj = { nonEditable: [[]] };
-
-        const result = rulesUtils(props, validationObj);
+    test('should encrypt plaintext with the given public key', () => {
+        const result = encrypt(exp, mod, nonce, plain, 'OTP');
+        expect(result).toBeDefined(); // Ensure something is returned
+        expect(typeof result).toBe('string'); // The result should be a string
         
-        expect(result[0].fields[0].default_visibility).toBe(null);  // should be null
+        // Additional checks can be performed on the output format
+        // This will depend on what your encryption function outputs
+        expect(result).not.toBe(plain); // Ensure the encrypted text is not equal to plaintext
     });
 
-    it('should set default_visibility to "No" for hidden fields', () => {
-        const props: Array<Array<FieldsetModel>> = [
-            [{
-                logical_field_name: 'fieldset1',
-                fields: [{ logical_field_name: 'place_of_birth' }]
-            }]
-        ];
-        const validationObj = { nonEditable: [[]] };
-
-        const result = rulesUtils(props, validationObj);
-
-        expect(result[0].fields[0].default_visibility).toBe('No');  // should be "No"
+    test('should change result when input plaintext changes', () => {
+        const newPlain = 'Goodbye, World!';
+        const result1 = encrypt(exp, mod, nonce, plain, 'OTP');
+        const result2 = encrypt(exp, mod, nonce, newPlain, 'OTP');
+        
+        expect(result1).not.toEqual(result2); // The encrypted results should not be equal
     });
 
-    it('should filter out fields with default_visibility as "No"', () => {
-        const props: Array<Array<FieldsetModel>> = [
-            [{
-                logical_field_name: 'fieldset1',
-                fields: [
-                    { logical_field_name: 'fieldA', default_visibility: 'Yes' },
-                    { logical_field_name: 'place_of_birth', default_visibility: 'No' }
-                ]
-            }]
-        ];
-        const validationObj = { nonEditable: [[]] };
+    test('should handle empty plaintext', () => {
+        const emptyPlain = '';
+        const result = encrypt(exp, mod, nonce, emptyPlain, 'OTP');
+        
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('string');
+        expect(result).not.toBe(emptyPlain); // Ensure the encrypted result isn't the same as empty plaintext
+    });
 
-        const result = rulesUtils(props, validationObj);
-
-        expect(result[0].fields.length).toBe(1); // only fieldA should be present
-        expect(result[0].fields[0].logical_field_name).toBe('fieldA');
+    test('should return a valid base64 encoded string if stage is OTP', () => {
+        const result = encrypt(exp, mod, nonce, plain, 'OTP');
+        
+        // For proper validation, check if the result is a valid base64 string
+        const base64Regex = /^[A-Za-z0-9+/]+={0,2}$/;
+        expect(base64Regex.test(result)).toBe(true); // Validate if the result is a Base64 encoded string
     });
 });
