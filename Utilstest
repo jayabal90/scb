@@ -1,107 +1,721 @@
-import configureMockStore from 'redux-mock-store';
-import thunk from 'redux-thunk';
-import { exceptionCheck } from './path/to/your/exceptionCheck';
-import { errorAction } from "../utils/store/error-slice"; // Adjust the path as needed
-import { dispatchLoader } from "./common-service"; // Adjust the path as needed
+import { nextStage } from "../modules/dashboard/fields/stage.utils";
+import {
+  FindIndex,
+  getUrl,
+} from "../utils/common/change.utils";
+import { CONSTANTS } from "../utils/common/constants";
+import {
+  FormConfigModel,
+  KeyWithAnyModel,
+  MyinfoNoResponseModel,
+  UserFields,
+} from "../utils/model/common-model";
+import axios, { AxiosError } from "axios";
+import { errorAction } from "../utils/store/error-slice";
+import { loaderAction } from "../utils/store/loader-slice";
+import { lovAction } from "../utils/store/lov-slice";
+import { stagesAction } from "../utils/store/stages-slice";
+import { store } from "../utils/store/store";
+import { urlParamAction } from "../utils/store/urlparam-slice";
+import { ValueUpdateAction } from "../utils/store/value-update-slice";
+import { exceptionCheck } from "./exception-handling-utils";
+import generatePayload from "./payload";
+import submitService from "./submit-service";
+import {  ibankEncryptMock, ibankRegisterUserDataMock } from "../assets/_mock-data/authorize-mock"; //Added for mock json for authorize call till csl integration
+import encrypt from "../services/encryption";
+import { pendingApplicationAction } from "../utils/store/pendingApplication-slice";
+import { lovDescAction } from "../utils/store/lov-desc-slice";
+export type AppDispatch = typeof store.dispatch;
 
-const middlewares = [thunk];
-const mockStore = configureMockStore(middlewares);
+export const dispatchError = (error: AxiosError | MyinfoNoResponseModel) => {
+  return (dispatch: AppDispatch) => {
+    dispatch(dispatchLoader(false));
+    if (error && error.response) {
+      dispatch(
+        errorAction.getError({
+          statusCode: error.response.status,
+          statusText: error.response.statusText,
+        })
+      );
+    } else {
+      dispatch(
+        errorAction.getError({
+          statusCode: "error",
+          statusText: "no response",
+        })
+      );
+    }
+  };
+};
 
-describe("exceptionCheck", () => {
-  let store: any;
+export const dispatchLoader = (loader: boolean): any => {
+  return (dispatch: AppDispatch) => {
+    dispatch(
+      loaderAction.getState({
+        isFetching: loader,
+      })
+    );
+  };
+};
 
-  beforeEach(() => {
-    store = mockStore({});
-  });
+export const getLovData = (field: string, searchKey?: string, cityKey?: any, resumeFlag?: any, resData?: any): any => {
+  const baseUrl = `${process.env.REACT_APP_RTOB_BASE_URL}`;
+  const lovRef = process.env.REACT_APP_RTOB_LOVREF;
+  const formType = process.env.REACT_APP_RTOB_FORMTYPE;
+  const endpoint = searchKey
+    ? `${lovRef + field + formType}&size=25&q=${searchKey}`
+    : cityKey ? `${lovRef + field + formType}&nestedFieldName=${cityKey}` : `${lovRef + field}`;
 
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
+  const url = baseUrl + endpoint;
 
-  it("should resolve for CONTINUE action with INFO response type", async () => {
-    const response = {
-      status: 200,
-      data: {
-        application: {
-          response_action: "CONTINUE",
-          response_type: "INFO"
+  return async (dispatch: AppDispatch) => {
+    try {
+      const res = await axios.get(url);
+      if (res.data) {
+        const refValue = res.data
+        if(refValue.length > 0) {
+            const removedDuplicatesRefValue = refValue.filter((refValue: KeyWithAnyModel, index: number, self: KeyWithAnyModel) =>
+              index === self.findIndex((t: KeyWithAnyModel) => (t.CODE_DESC === refValue.CODE_DESC && t.CODE_VALUE === refValue.CODE_VALUE)))
+            dispatch(
+              lovAction.getLovData({
+                label: field,
+                value: removedDuplicatesRefValue,
+              })
+            );
         }
-      }
-    };
-    
-    await store.dispatch(exceptionCheck(response));
-    expect(store.getActions()).toEqual([]);
-  });
-
-  it("should dispatch error for RESUBMIT action with errors", async () => {
-    const response = {
-      status: 200,
-      data: {
-        application: {
-          response_action: "RESUBMIT",
-          response_type: "HARD",
-          errors: {
-            errors: [{ detail: "Some error occurred." }]
+        if(resumeFlag) {
+          if(refValue.length > 0 && resData.applicants[0][field]) {
+            const filterData = refValue.filter((refValue: KeyWithAnyModel) => 
+            (refValue.CODE_VALUE === resData.applicants[0][field]))
+            dispatch(
+              lovDescAction.addLovData({
+                fieldData: {
+                  fieldName: field,
+                  code_desc: filterData[0].CODE_DESC,
+                  code_value: filterData[0].CODE_VALUE
+                }
+              })
+            );
           }
         }
+        return await Promise.resolve(res);
+      } else {
+        defaultError();
       }
-    };
+    } catch (err: any) {
+      /**Commented for local setup */
+      dispatch(dispatchError(err));
+      return await Promise.reject(err.response);
+    }
+  };
+};
 
-    await store.dispatch(exceptionCheck(response)).catch((err) => {
-      expect(err).toBe("Rejected");
-      const actions = store.getActions();
-      expect(actions).toContainEqual(errorAction.getRetryStatus(true));
-      expect(actions).toContainEqual(expect.objectContaining(dispatchLoader(false)));
-    });
-  });
+export const postRequest = (
+  data: any,
+  currentStageFields: any,
+  currentStageId: string,
+  applicationJourney: string | null,
+  stageSelectorApplicants?: any,
+): any => {
+  const baseUrl = `${process.env.REACT_APP_RTOB_BASE_URL}`;
+  const createEndPoint = `${process.env.REACT_APP_RTOB_CREATE_END_POINT}`;
+  const basicEndPoint = `${process.env.REACT_APP_RTOB_BASIC_END_POINT}`;
+  const partnerVerifyEndPoint = `${process.env.REACT_APP_RTOB_PARTNER_VERIFY_END_POINT}`;
+  const saveEndPoint = `${process.env.REACT_APP_RTOB_SAVE_END_POINT}`;
+  const applyEndPoint = `${process.env.REACT_APP_RTOB_APPLY_END_POINT}`;
+  const confirmEndPoint = `${process.env.REACT_APP_RTOB_CONFIRM_END_POINT}`;
+  const application = `${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}`;
+  const channelRefNo = getUrl.getChannelRefNo().channelRefNo;
+  const applicationRefNo = getUrl.getChannelRefNo().applicationRefNo;
+  const saveUrl = `${application + channelRefNo + saveEndPoint}`;
+  const createUrl = `${application + channelRefNo + createEndPoint}`;
+  const basicDataUrl = `${application + channelRefNo + basicEndPoint}`;
+  const partnerVerifyUrl = `${application + channelRefNo + partnerVerifyEndPoint}`;
+  const applyUrl = `${application + channelRefNo + applyEndPoint}`;
+  const confirmUrl = `${application + channelRefNo + confirmEndPoint}`;
+  let url = baseUrl + saveUrl;
+  if (currentStageId === CONSTANTS.STAGE_NAMES.SSF_1) {
+    url = baseUrl + createUrl;
+  } else if (currentStageId === CONSTANTS.STAGE_NAMES.BD_3) {
+    url = baseUrl + basicDataUrl;
+  } else if (currentStageId === CONSTANTS.STAGE_NAMES.BD_2) {
+    url = baseUrl + partnerVerifyUrl;
+  } else if (currentStageId === CONSTANTS.STAGE_NAMES.AD_2) {
+    url = baseUrl + applyUrl;
+  } else if (currentStageId === CONSTANTS.STAGE_NAMES.RP) {
+    url = baseUrl + confirmUrl;
+  }
 
-  it("should resolve for SUCCESS action with SOFT response type", async () => {
-    const response = {
-      status: 200,
-      data: {
-        application: {
-          response_action: "SUCCESS",
-          response_type: "SOFT"
-        }
-      }
-    };
+  /* Skip Preserve call in ibank registration*/
+  if (currentStageId === CONSTANTS.STAGE_NAMES.AD_3) {
+    return async (dispatch: AppDispatch) => {
+      const stageTo = nextStage(currentStageId, applicationJourney);
+      dispatch(stagesAction.updateStageId(stageTo));
+      dispatch(lovRequests(data.stageInfo, stageTo));
+      return Promise.resolve();
+    }
+  }
 
-    await store.dispatch(exceptionCheck(response));
-    expect(store.getActions()).toEqual([]);
-  });
+  let payload = generatePayload.createPayload(data, currentStageFields, url, stageSelectorApplicants, 'NORESUME');
 
-  it("should dispatch error for STOP action with HARD response type", async () => {
-    const response = {
-      status: 200,
-      data: {
-        application: {
-          response_action: "STOP",
-          response_type: "HARD",
-          errors: {
-            errors: [{ detail: "Some error occurred." }]
+  return async (dispatch: AppDispatch) => {
+    dispatch(dispatchLoader(true));
+    try {
+      let res: any;
+      await dispatch(exceptionCheck(await axios.post(url, payload))).then(
+        (response: any) => {
+          if (response !== "Rejected") {
+            res = response;
+            if (res) {
+              if (res.data) {
+                dispatch(
+                  stagesAction.setJourneyType(res.data.application.journey_type)
+                );
+              }
+              if (!applicationRefNo && res.data) { dispatch(urlParamAction.getAuthorize({ "applicationRefNo": res.data.application.application_reference })) }
+              if (!applicationJourney) {
+                // dispatch(stagesAction.deleteStageInput())
+                dispatch(
+                  stagesAction.setJourneyType(res.data.application.journey_type)
+                );
+                applicationJourney = res.data.application.journey_type;
+              }
+              const stageTo = nextStage(currentStageId, applicationJourney);
+              dispatch(stagesAction.updateStageId(stageTo));
+              dispatch(lovRequests(data.stageInfo, stageTo));
+              return Promise.resolve(res);
+            }
           }
         }
+      );
+    } catch (error: any) {
+      /* commented for local setup */
+      if (error !== "Rejected") {
+        dispatch(dispatchError(error));
       }
-    };
+      return await Promise.reject(error.response);
+      /* commented for local setup */
+    }
+  };
+};
 
-    await store.dispatch(exceptionCheck(response)).catch((err) => {
-      expect(err).toBe("Rejected");
-      const actions = store.getActions();
-      expect(actions).toContainEqual(expect.objectContaining(errorAction.getExceptionList(expect.anything())));
-      expect(actions).toContainEqual(dispatchLoader(false));
-    });
+export const lovRequests = (
+  res: any,
+  isBdStage: string,
+  missingFields?: any,
+  resumeFlag?: any
+): any => {
+  return (dispatch: AppDispatch) => {
+    if (res) {
+      const requestAll = async () => {
+        let currentStage = [isBdStage];
+        console.log(currentStage)
+        // Passing an array of promises that are already resolved to trigger Promise.all as soon as possible
+        let resolvedLov: any = [];
+        currentStage.forEach(async (stage: string) => {
+          console.log(res, stage)
+          const index = FindIndex(res, stage === 'ld-1' ? "ad-11" : stage);
+          console.log(index)
+          if (res.fieldMetaData.data.stages[index]) {
+            res.fieldMetaData.data.stages[index].fields.map(
+              async (lov: KeyWithAnyModel) => {
+                try {
+                  if(!resumeFlag) {
+                    if (isBdStage !== CONSTANTS.STAGE_NAMES.RP) {
+                      if (lov.lov === "Yes" && (isBdStage !== "bd-5")) {
+                        if (isBdStage !== CONSTANTS.STAGE_NAMES.BD_3 && isBdStage !== CONSTANTS.STAGE_NAMES.AD_1) {
+                          console.log('lov.component_type--',lov.component_type, '--lov--',lov)
+                          if (lov.lov === "Yes" && lov.rwb_category === isBdStage) {
+                            
+                            if(lov.component_type === 'Text' || lov.component_type === 'Selection Box' || lov.component_type === 'Radio With Label' || lov.component_type === 'short-text' || lov.component_type === 'Phone' || lov.component_type === 'Multi Selection Box'){
+                              resolvedLov.push(
+                                dispatch(getLovData(lov.logical_field_name))
+                              );
+                            }
+                          }
+                        } else if (isBdStage === CONSTANTS.STAGE_NAMES.BD_3
+                          && (lov.logical_field_name !== CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE)
+                          && (lov.logical_field_name !== CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE)
+                          && (lov.logical_field_name !== CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT)
+                          && (lov.logical_field_name !== CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2)
+                        ) {
+                          resolvedLov.push(
+                            dispatch(getLovData(lov.logical_field_name))
+                          );
+                        } 
+                        else if (isBdStage === CONSTANTS.STAGE_NAMES.AD_1
+                          && (lov.logical_field_name !== CONSTANTS.LOGICAL_FIELD_NAMES.COUNTRY_OF_TAX_RESIDENCE + "_1")
+                          && (lov.logical_field_name !== CONSTANTS.LOGICAL_FIELD_NAMES.COUNTRY_OF_TAX_RESIDENCE + "_2")
+                          && (lov.logical_field_name !== CONSTANTS.LOGICAL_FIELD_NAMES.COUNTRY_OF_TAX_RESIDENCE + "_3")
+                          && (lov.logical_field_name !== CONSTANTS.LOGICAL_FIELD_NAMES.COUNTRY_OF_TAX_RESIDENCE + "_4")
+                        ) 
+                        {
+                          resolvedLov.push(
+                            dispatch(getLovData(lov.logical_field_name))
+                          );
+                        }
+                      } else if (lov.lov === "Yes" && (isBdStage === "bd-5" && (lov.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1))) {
+                        resolvedLov.push(dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1)))
+                      } else if (lov.lov === "Yes" && (isBdStage === "bd-5" && (lov.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2))) {
+                        resolvedLov.push(dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2)))
+                      }
+                      else if(lov.lov === "No" && (lov.logical_field_name === "mobile_number")) {
+                        console.log('lov.logical_field_name--',lov.logical_field_name)
+                        resolvedLov.push(
+                          dispatch(getLovData(lov.logical_field_name))
+                        );
+                      }
+                    }
+                  }
+                  else {
+                    console.log(lov)
+                    if (lov.lov === "Yes" && (lov.logical_field_name !== 'tax_residence_countries' || lov.logical_field_name !== 'direct_marketing' || lov.logical_field_name !== 'acknowledgement_cert' || lov.logical_field_name !== 'client_declaration_cert' || lov.logical_field_name !== 'client_sc_consent_title')) {
+                      resolvedLov.push(
+                        dispatch(getLovData(lov.logical_field_name, '', '', resumeFlag, res))
+                      ); 
+                    } else if(lov.lov === "No" && lov.logical_field_name === 'residential_address_eng' && res.applicants[0][CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1]) {
+                      dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1, '', '', resumeFlag, res))
+                    } else if(lov.lov === "No" && lov.logical_field_name === 'mailing_address_eng' && res.applicants[0][CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2]) {
+                      dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2, '', '', resumeFlag, res))
+                    }
+
+                  }
+                } catch (err) {
+                  console.log(err);
+                }
+              }
+            );
+          }
+        });
+        return await Promise.all(resolvedLov);
+      };
+      return requestAll().then(() => {
+        dispatch(dispatchLoader(false));
+      });
+    }
+  };
+};
+
+export const fieldLevelSwipe = (
+  formConfigRes: FormConfigModel
+): FormConfigModel => {
+  formConfigRes.fieldMetaData.data.stages[1].fields.sort(
+    (a: KeyWithAnyModel, b: KeyWithAnyModel) => {
+      return parseInt(a.seq_no) - parseInt(b.seq_no);
+    }
+  );
+  return formConfigRes;
+};
+
+export const technicalError = (data: any) => {
+  const error = {
+    response: {
+      status: data["status-code"],
+      statusText: "no response",
+    },
+  };
+  return error;
+};
+
+export const isFormUpdate = (data: boolean | null): any => {
+  return (dispatch: AppDispatch) => {
+    dispatch(ValueUpdateAction.getValueUpdate(data));
+  };
+};
+
+export const sortByAscendingOrder = (payload: any) => {
+  let sorted_data = payload;
+  sorted_data["applicant"] = sortingList(payload["applicant"],'object');
+  sorted_data["application"] = sortingList(payload["application"],'object');
+  return sorted_data;
+};
+
+export const sortingList = (list: any,type:string) => {
+  return list && Object.keys(list)
+      .sort()
+    .reduce((accumulator: any, key: any) => {
+          accumulator[key] = list[key];
+          return accumulator;
+    },type==='array'?[]:{});
+};
+
+export const filterProducDetails = () => {
+  const product = JSON.parse(JSON.stringify(getUrl.getProductInfo()));
+  product.filter((item: any) => {
+    delete item.company_category;
+    delete item.premiumCode;
+    delete item.product_title;
+    return item;
   });
+  return product;
+};
 
-  it("should reject for non 200 or 201 status", async () => {
-    const response = {
-      status: 400,
-      data: {}
+export const gbaGenerate = (data: KeyWithAnyModel): any => {
+  const channelRefNo = getUrl.getChannelRefNo().channelRefNo;
+  let url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${channelRefNo}${process.env.REACT_APP_RTOB_GBA_GENERATE}`;
+  if (data.flowType === CONSTANTS.OTP_FLOW.RESUME)
+    url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${submitService.generateUUID}${process.env.REACT_APP_RTOB_GBA_GENERATE}`;
+  // const payload = { data };
+  return async (dispatch: AppDispatch) => {
+    dispatch(dispatchLoader(true));
+    return axios
+      .post(url, sortByAscendingOrder(data))
+      .then((response) => {
+        if (response.data) {
+          dispatch(dispatchLoader(false));
+          return Promise.resolve(response.data); //After csl integration
+        } 
+        // else {
+        //   defaultError();
+        // }
+      })
+      .catch((error) => {
+        dispatch(dispatchError(error));  //After csl integration
+        return Promise.reject(error);
+      });
+  };
+};
+
+export const dispatchPendingApplication = (pendingApplications: any): any => {
+  return (dispatch: AppDispatch) => {
+    dispatch(pendingApplicationAction.createPendingApplication(pendingApplications));
+  };
+};
+
+/** * The method used to generate the gba-verify call
+ * @returns
+ */
+export const gbaVerify = (data: KeyWithAnyModel): any => {
+  const channelRefNo = getUrl.getChannelRefNo().channelRefNo;
+  let url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${channelRefNo}${process.env.REACT_APP_RTOB_GBA_VERIFY}`;
+  if (data['flow-type'] === CONSTANTS.OTP_FLOW.RESUME)
+    url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${submitService.generateUUID}${process.env.REACT_APP_RTOB_GBA_VERIFY}`;
+  // const payload = { data };
+
+  return async (dispatch: AppDispatch) => {
+    dispatch(dispatchLoader(true));
+    return axios
+      .post(url, sortByAscendingOrder(data))
+      .then((response) => {
+        if (response.status === 200) {
+          dispatch(dispatchLoader(false));
+          if (response.data && response.data["status"] === "SUCCESS" && response.data.Application) {
+            dispatch(dispatchPendingApplication(response.data.Application));
+          }
+          return Promise.resolve(response.data);    //After csl integration
+        } else {
+          defaultError();
+        }
+      })
+      .catch((error) => {
+        dispatch(dispatchError(error)); //Commented for local setup
+        return Promise.reject(error);  //Commented for local setup
+      });
+  };
+};
+
+/**
+ * The method used to set hard stop if request fail
+ * @returns
+ */
+export const defaultError = () => {
+  return async (dispatch: AppDispatch) => {
+    const error = {
+      response: {
+        status: "error",
+        statusText: "no response",
+      },
     };
+    dispatch(dispatchError(error));
+  };
+};
+/**
+ * The method is used to check Product Details for standlone and buddles cards
+ */
 
-    await store.dispatch(exceptionCheck(response)).catch((err) => {
-      expect(err).toBe("Rejected");
-      const actions = store.getActions();
-      expect(actions).toContainEqual(expect.objectContaining(errorAction.getExceptionList(expect.anything())));
+export const checkProductDetails = (noOfProducts: KeyWithAnyModel) => {
+  let hasCC, hasPL, hasCA, hasSA, hasCASA, hasCCPL, hasOnlyCCPL, hasOnlyCASA;
+  let CAProduct, SAProduct, CCProduct, PLProduct;
+  let CAProductLength: number = 0,
+    SAProductLength: number = 0,
+    CCProductLength: number = 0,
+    PLProductLength: number = 0;
+  let returnValue;
+
+  if (noOfProducts.length === 1) {
+    CAProduct = noOfProducts[0].product_category === "CA";
+    SAProduct = noOfProducts[0].product_category === "SA";
+    CCProduct = noOfProducts[0].product_category === "CC";
+    PLProduct = noOfProducts[0].product_category === "PL";
+    if (CAProduct || SAProduct) {
+      returnValue = true;
+    }
+    if (CCProduct || PLProduct) {
+      returnValue = false;
+    }
+  }
+  if (noOfProducts.length > 1) {
+    for (let i = 0; i < noOfProducts.length; i++) {
+      if (noOfProducts[i].product_category === "CA") {
+        CAProductLength = CAProductLength + 1;
+      }
+      if (noOfProducts[i].product_category === "SA") {
+        SAProductLength = CAProductLength + 1;
+      }
+      if (noOfProducts[i].product_category === "CC") {
+        CCProductLength = CAProductLength + 1;
+      }
+      if (noOfProducts[i].product_category === "PL") {
+        PLProductLength = CAProductLength + 1;
+      }
+    }
+    hasPL = PLProductLength >= 1;
+    hasCC = CCProductLength >= 1;
+    hasCA = CAProductLength >= 1;
+    hasSA = SAProductLength >= 1;
+    hasCASA = CAProductLength >= 1 || SAProductLength >= 1;
+    hasCCPL = CCProductLength >= 1 || PLProductLength >= 1;
+    hasOnlyCCPL =
+      (CCProductLength >= 1 || PLProductLength >= 1) &&
+      !(CAProductLength >= 1 || SAProductLength >= 1);
+    hasOnlyCASA =
+      (CAProductLength >= 1 || SAProductLength >= 1) &&
+      !(CCProductLength >= 1 || PLProductLength >= 1);
+    if (hasCASA || hasSA || hasCA || hasOnlyCASA) returnValue = true;
+    if (hasCCPL || hasOnlyCCPL || hasPL || hasCC) returnValue = false;
+  }
+  return returnValue;
+};
+
+export const ibankEncrypt = (userInputSelector: UserFields): any => {
+  const channelRefNo = getUrl.getChannelRefNo().channelRefNo;
+  const url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${channelRefNo}${process.env.REACT_APP_RTOB_IBANK_ENCRYPT}`;
+  const randomNumber = Math.random();
+
+  const payload = {
+    "random_number": randomNumber
+  };
+  return async (dispatch: AppDispatch) => {
+    dispatch(dispatchLoader(true));
+    return await axios
+      .post(url, payload)
+      .then(async (responses) => {
+        /**Added for local setup start */
+        const response = ibankEncryptMock
+        /**Added for local setup end */
+        const secNonce = response.data["ibank-encryptions"].securityNonce;
+        const modules = response.data["ibank-encryptions"].modules;
+        const exponent = response.data["ibank-encryptions"].exponent
+        const plain = encrypt(exponent, modules, secNonce, userInputSelector.applicants[0].password_ibk, 'Ibanking');
+        handleFieldDispatch('password_ibk', plain, dispatch)
+        handleFieldDispatch('password_ibk_confirm', '', dispatch)
+        // return Promise.resolve(response.data);
+        return await dispatch(ibankRegisterUserData(secNonce, plain))
+          .then(async (ibankresponse: any) => {
+            return Promise.resolve(ibankresponse);
+          })
+
+      })
+      .catch(async (error) => {
+        /**Added for local setup start */
+        const response = ibankEncryptMock
+        const secNonce = response.data["ibank-encryptions"].securityNonce;
+        const modules = response.data["ibank-encryptions"].modules;
+        const exponent = response.data["ibank-encryptions"].exponent
+        const plain = encrypt(exponent, modules, secNonce, userInputSelector.applicants[0].password_ibk, 'Ibanking');
+
+        handleFieldDispatch('password_ibk', plain, dispatch)
+        handleFieldDispatch('password_ibk_confirm', '', dispatch)
+        // return Promise.resolve(response.data);
+        return await dispatch(ibankRegisterUserData(secNonce, plain))
+          .then(async (ibankresponse: any) => {
+            return Promise.resolve(ibankresponse);
+          })
+        /**Added for local setup end */
+        // dispatch(dispatchLoader(false));
+        // dispatch(dispatchError(error)); //Commented for local setup
+        // return Promise.reject(error); //Commented for local setup
+      });
+  };
+};
+
+/**
+ * The method used for ibank Registration User Data
+ */
+export const ibankRegisterUserData = (nonce: string, pwd: String): any => {
+  const channelRefNo = getUrl.getChannelRefNo().channelRefNo;
+  const url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${channelRefNo}${process.env.REACT_APP_RTOB_IBANK_REGISTER_USER_DATA}`;
+
+  const payload = {
+    "application": {
+      "channel_reference": channelRefNo,
+      "application_reference": getUrl.getChannelRefNo().applicationRefNo
+    },
+    "applicants": [{
+      "password_ibk": pwd,
+    }]
+  }
+
+  return async (dispatch: AppDispatch) => {
+    handleFieldDispatch('securityNonce', nonce, dispatch)
+    return axios
+      .post(url, payload)
+      .then((responses) => {
+        /**Added for local setup start */
+        const response = ibankRegisterUserDataMock
+        /**Added for local setup end */
+        dispatch(dispatchLoader(false));
+        handleFieldDispatch('is_banking_registered', response.data.applicants[0]['is_banking_registered'], dispatch)
+        handleFieldDispatch('ibankingregDate', response.data.applicants[0]['ibankingregDate'], dispatch)
+        return Promise.resolve();
+      })
+      .catch((error) => {
+        /**Added for local setup start */
+        const response = ibankRegisterUserDataMock
+        handleFieldDispatch('is_banking_registered', response.data.applicants[0]['is_banking_registered'], dispatch)
+        handleFieldDispatch('ibankingregDate', response.data.applicants[0]['ibankingregDate'], dispatch)
+        return Promise.resolve();
+        
+      });
+  };
+};
+
+
+
+/** * The method used to generate the gba-verify call
+ * @returns
+ */
+export const convertPinyin = (data: KeyWithAnyModel): any => {
+  const channelRefNo = getUrl.getChannelRefNo().channelRefNo;
+  const url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${channelRefNo}${process.env.REACT_APP_RTOB_PINYIN_TRANSLATOR}`;
+  const payload = data;
+
+  return async (dispatch: AppDispatch) => {
+    dispatch(dispatchLoader(true));
+    return axios
+      .post(url, payload)
+      .then((response) => {
+        if (response.status === 200) {
+          dispatch(dispatchLoader(false));
+          return Promise.resolve(response.data);    //After csl integration
+        } else {
+          defaultError();
+        }
+      })
+      .catch((error) => {
+        dispatch(dispatchError(error)); //Commented for local setup
+        return Promise.reject(error);  //Commented for local setup
+      });
+  };
+};
+
+/**
+ * The method used for AOF Dowload
+ */
+export const aofDownload = (): any => {
+  const channelRefNo = getUrl && getUrl.getChannelRefNo().channelRefNo;
+  const url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${channelRefNo}${process.env.REACT_APP_RTOB_AOF_DOWNLOAD}`;
+  return async (dispatch: AppDispatch) => {
+    dispatch(dispatchLoader(true));
+    return axios
+      .get(url, {responseType: 'blob'})
+      .then((response) => {
+        if (response.status === 200) {
+          dispatch(dispatchLoader(false));
+          //After csl integration
+          const link = document.createElement('a');
+          var blob = new Blob([response.data], { type: "application/pdf" });
+          if((navigator.userAgent.indexOf("Chrome") !== -1  || navigator.userAgent.match('CriOS'))){
+            blob = new Blob([response.data], { type: "application/pdf" });
+          }else{
+             var pdfBase64Data = new Uint8Array(response.data);
+             blob = new Blob([pdfBase64Data], { type: "application/octet-stream" });
+          }
+          const dataURL = window.URL.createObjectURL(blob);
+          link.href = dataURL;
+          link.download =  getUrl.getChannelRefNo().applicationRefNo + ".pdf";
+          link.click();
+          window.URL.revokeObjectURL(dataURL);
+        } else {
+          defaultError();
+        }
+      })
+      .catch((error) => {
+        dispatch(dispatchError(error));  //After csl integration
+        return Promise.reject(error);
+      });
+  };
+};
+
+export const preserveRequest = (
+  data: any,
+  currentStageFields: any,
+  stageSelectorApplicants?: any,
+): any => {
+  const baseUrl = `${process.env.REACT_APP_RTOB_BASE_URL}`;
+  const saveEndPoint = `${process.env.REACT_APP_RTOB_SAVE_END_POINT}`;
+  const application = `${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}`;
+  const channelRefNo = getUrl.getChannelRefNo().channelRefNo;
+  const saveUrl = `${application + channelRefNo + saveEndPoint}`;
+  let url = baseUrl + saveUrl;
+
+  let payload = generatePayload.createPayload(data, currentStageFields, url, stageSelectorApplicants, 'RESUME');
+  return async (dispatch: AppDispatch) => {
+    dispatch(dispatchLoader(true));
+    return axios
+    .post(url, payload)
+    .then((response) => {
+      if (response.status === 200) {
+        dispatch(dispatchLoader(false));
+        return Promise.resolve(response);    //After csl integration
+      } else {
+        defaultError();
+      }
+    })
+    .catch((error) => {
+      dispatch(dispatchError(error)); //Commented for local setup
+      return Promise.reject(error);  //Commented for local setup
     });
-  });
-});
+  }
+};
+
+export const resumeRequest = (appRef : string | null): any => {
+  const baseUrl = `${process.env.REACT_APP_RTOB_BASE_URL}`;
+  const endPoint = appRef + `${process.env.REACT_APP_RTOB_RESUME_END_POINT}`;
+  const url = `${
+    baseUrl +
+    process.env.REACT_APP_RTOB_APPLICATION_END_POINT +
+    endPoint
+  }`;
+
+  return async (dispatch: AppDispatch) => {
+    dispatch(dispatchLoader(true));
+    return await axios.get(url)
+      .then((response: any) => {
+        if (response.data) {
+          dispatch(dispatchLoader(false));
+          dispatch(urlParamAction.getAuthorize({ channelRefNo: response.data.application.channel_reference }));  
+          return Promise.resolve(response.data);
+        }
+      })
+      .catch((error) => {
+        dispatch(dispatchError(error)); //Commented for local setup
+        return Promise.reject(error);  //Commented for local setup
+      });
+  };
+};
+
+const handleFieldDispatch = (
+  fieldName: string,
+  childData: string | number,
+  dispatch: AppDispatch,
+) => {
+  dispatch(
+    stagesAction.modifyStage({
+      fieldData: {
+        fieldName: fieldName,
+        value: childData,
+      }
+    })
+  );
+};
