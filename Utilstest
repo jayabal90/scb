@@ -1,123 +1,90 @@
-import React from "react";
-import { render, fireEvent, screen } from "@testing-library/react";
-import { Provider } from "react-redux";
-import { createStore } from "redux";
-import { Button } from "./Button"; // Adjust import based on your project structure
-import rootReducer from "../../../utils/store"; // Import your root reducer or create a simple one for testing
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react';
+import { Button } from './Button'; // Adjust the import based on your file structure
+import { useDispatch, useSelector } from 'react-redux';
 
-// Create a mock store for testing
-const createMockStore = (initialState) => {
-  return createStore(rootReducer, initialState);
-};
+// Mock the useDispatch and useSelector hooks
+jest.mock('react-redux', () => ({
+  useDispatch: jest.fn(),
+  useSelector: jest.fn(),
+}));
 
-describe("Button Component", () => {
-  let store;
-
+describe('Button Component', () => {
+  const mockDispatch = jest.fn();
+  const mockSelector = {
+    stages: {
+      stages: [], // Add initial state as needed for your tests
+      userInput: {
+        applicants: [{
+          res_name_of_street_1: 'Street 1',
+          res_building_estate_1: 'Building 1',
+          res_room_flat_1: 'Room 1',
+        }]
+      }
+    },
+    tax: { count: 1, maxCount: 5 },
+  };
+  
   beforeEach(() => {
-    store = createMockStore({
-      stages: {
-        stages: [], // Provide an initial state for stages as needed
-        userInput: {
-          applicants: [
-            {
-              res_name_of_street_1: "Test Street",
-              res_name_of_street_3: "Apt 101",
-              res_building_estate_1: "Building 1",
-              res_building_estate_3: "Building 3",
-              res_room_flat_1: "Room 1",
-              res_room_flat_3: "Room 3",
-            },
-          ],
-        },
-      },
-      tax: {
-        count: 1,  // Mocking the tax count
-        maxCount: 5, // Mocking the max count
-      },
-    });
+    // Clear mock data before each test
+    jest.clearAllMocks();
+    useDispatch.mockReturnValue(mockDispatch);
+    useSelector.mockImplementation(callback => callback(mockSelector));
   });
 
-  test("renders button with correct props", () => {
-    const handleCallbackMock = jest.fn();
-    const handleFieldDispatchMock = jest.fn();
+  test('renders button with correct props', () => {
+    const props = {
+      data: {
+        logical_field_name: 'add_tax_residence',
+        rwb_label_name: 'Add Tax Residence',
+        regex: ''
+      },
+      handleCallback: jest.fn(),
+      handleFieldDispatch: jest.fn(),
+      value: '',
+    };
 
-    render(
-      <Provider store={store}>
-        <Button
-          data={{
-            logical_field_name: "add_tax_residence",
-            rwb_label_name: "Add Tax Residence",
-            regex: ".*",
-          }}
-          handleCallback={handleCallbackMock}
-          handleFieldDispatch={handleFieldDispatchMock}
-        />
-      </Provider>
-    );
+    const { getByTestId } = render(<Button {...props} />);
 
-    const button = screen.getByRole('button', { name: /Add Tax Residence/i });
-    expect(button).toBeInTheDocument();
-    expect(button).toHaveAttribute('name', 'add_tax_residence');
+    expect(getByTestId('button')).toBeInTheDocument();
+    expect(getByTestId('button')).toHaveValue('Add Tax Residence');
   });
 
-  test("calls userInput function when button is clicked", () => {
-    const handleCallbackMock = jest.fn();
-    const handleFieldDispatchMock = jest.fn();
+  test('clicking the button calls userInput function', () => {
+    const props = {
+      data: {
+        logical_field_name: 'add_tax_residence',
+        rwb_label_name: 'Add Tax Residence',
+        regex: ''
+      },
+      handleCallback: jest.fn(),
+      handleFieldDispatch: jest.fn(),
+      value: '',
+    };
 
-    render(
-      <Provider store={store}>
-        <Button
-          data={{
-            logical_field_name: "add_tax_residence",
-            rwb_label_name: "Add Tax Residence",
-            regex: ".*",
-          }}
-          handleCallback={handleCallbackMock}
-          handleFieldDispatch={handleFieldDispatchMock}
-        />
-      </Provider>
-    );
+    const { getByTestId } = render(<Button {...props} />);   
+    fireEvent.click(getByTestId('button'));
 
-    const button = screen.getByRole('button', { name: /Add Tax Residence/i });
-    fireEvent.click(button);
+    // Expect userInput to be called with correct argument
+    expect(mockDispatch).toHaveBeenCalledTimes(1); // Ensure dispatch was called
+  });
+
+  test('hides button when taxSelector count exceeds maxCount', () => {
+    mockSelector.tax.count = 6; // Set count higher than maxCount
+    const props = {
+      data: {
+        logical_field_name: 'add_tax_residence',
+        rwb_label_name: 'Add Tax Residence',
+        regex: ''
+      },
+      handleCallback: jest.fn(),
+      handleFieldDispatch: jest.fn(),
+      value: '',
+    };
+
+    const { getByTestId } = render(<Button {...props} />);
     
-    // Check if the addTaxDetails function was called
-    // You would need to spy on addTaxDetails or trackEvents.mockRestore if it was inside the component
-  });
-
-  test("disables button when tax count exceeds maxCount", () => {
-    const handleCallbackMock = jest.fn();
-    const handleFieldDispatchMock = jest.fn();
-
-    // Update store to set tax.count > tax.maxCount
-    store = createMockStore({
-      stages: {
-        stages: [],
-        userInput: {
-          applicants: [],
-        },
-      },
-      tax: {
-        count: 6,
-        maxCount: 5,
-      },
-    });
-
-    render(
-      <Provider store={store}>
-        <Button
-          data={{
-            logical_field_name: "add_tax_residence",
-            rwb_label_name: "Add Tax Residence",
-            regex: ".*",
-          }}
-          handleCallback={handleCallbackMock}
-          handleFieldDispatch={handleFieldDispatchMock}
-        />
-      </Provider>
-    );
-
-    const button = screen.getByRole('button', { name: /Add Tax Residence/i });
-    expect(button).toHaveClass("hide-btn");
+    // Button should be hidden due to updated taxSelector
+    expect(getByTestId('button')).not.toBeVisible();
   });
 });
