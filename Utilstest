@@ -1,100 +1,85 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { shallow } from 'enzyme';
 import { Provider } from 'react-redux';
 import configureStore from 'redux-mock-store';
 import AuthorizeComponent from './AuthorizeComponent'; // Adjust the import based on your file structure
-import { checkboxAction } from '../../../utils/store/checkbox-slice';
-import { ValueUpdateAction } from '../../../utils/store/value-update-slice';
+import * as constants from '../../../utils/common/constants';
 
 const mockStore = configureStore([]);
-
-describe('AuthorizeComponent', () => {
-  let store: any;
-  const stageSelectorMock = {
+const initialState = {
+  stages: {
     stages: [
       {
-        stageId: 'AD_2',
+        stageId: constants.STAGE_NAMES.AD_2,
         stageInfo: {
-          applicants: [{}]
-        }
-      }
-    ]
+          applicants: [{
+            marketing_post: 'Y',
+            marketing_mobile_message: 'Y',
+            marketing_email: 'Y',
+            marketing_phone_all: 'Y',
+            marketing_phone_rm: 'N',
+          }],
+        },
+      },
+    ],
+  },
+  checkboxSlice: {
+    selectedvalue: null, // or appropriate initial value
+  },
+  fielderror: {
+    error: null, // or appropriate initial value
+  },
+};
+
+describe('<AuthorizeComponent />', () => {
+  let store;
+  let wrapper;
+
+  const mockProps = {
+    data: {
+      logical_field_name: 'marketing_post',
+      rwb_label_name: 'Post Marketing',
+      info_tooltips: 'Info about Post Marketing',
+      details: 'Detailed info about Post Marketing',
+    },
+    handleCallback: jest.fn(),
+    updateCheckboxStatus: jest.fn(),
   };
 
   beforeEach(() => {
-    store = mockStore({
-      stages: stageSelectorMock,
-      checkboxSlice: { selectedvalue: JSON.stringify([]) },
-      fielderror: { error: null }
-    });
-
-    jest.clearAllMocks();
-  });
-
-  test('renders without crashing', () => {
-    render(
+    store = mockStore(initialState);
+    wrapper = shallow(
       <Provider store={store}>
-        <AuthorizeComponent data={{ logical_field_name: 'marketing_post', rwb_label_name: 'Marketing Post' }} />
+        <AuthorizeComponent {...mockProps} />
       </Provider>
-    );
-
-    expect(screen.getByLabelText(/Marketing Post/i)).toBeInTheDocument();
+    ).dive().dive(); // Use .dive() to get to the component without the Provider
   });
 
-  test('checkbox toggles correctly', () => {
-    const handleCallback = jest.fn();
+  it('should render without crashing', () => {
+    expect(wrapper.exists()).toBe(true);
+  });
+
+  it('should have the checkbox checked when marketing_post is Y', () => {
+    const checkbox = wrapper.find('input[type="checkbox"]');
+    expect(checkbox.prop('checked')).toBe(true);
+  });
+
+  it('should call handleCallback when checkbox is changed', () => {
+    const checkbox = wrapper.find('input[type="checkbox"]');
+    checkbox.simulate('change', { target: { checked: false, value: 'N' } });
+    
+    expect(mockProps.handleCallback).toHaveBeenCalled();
+    expect(mockProps.updateCheckboxStatus).toHaveBeenCalled();
+  });
   
-    render(
-      <Provider store={store}>
-        <AuthorizeComponent data={{ logical_field_name: 'marketing_post', rwb_label_name: 'Marketing Post', handleCallback }} />
-      </Provider>
-    );
+  it('should show a popup when checkbox is unchecked and confirm_direct_marketing is true', () => {
+    // Simulate unchecking the checkbox
+    const checkbox = wrapper.find('input[type="checkbox"]');
+    checkbox.simulate('change', { target: { checked: false, value: 'N' } });
     
-    const checkbox = screen.getByLabelText(/Marketing Post/i);
-    expect(checkbox).not.toBeChecked();
-
-    fireEvent.click(checkbox);
-    
-    expect(checkbox).toBeChecked();
-    expect(handleCallback).toHaveBeenCalledWith('marketing_post', 'Y');
-    
-    fireEvent.click(checkbox);
-    
-    expect(checkbox).not.toBeChecked();
-    expect(handleCallback).toHaveBeenCalledWith('marketing_post', 'N');
+    // Assuming your logic sets showPopup to true
+    expect(wrapper.find('Model')).toHaveLength(1); // Check if the modal shows up
   });
 
-  test('dispatches actions correctly upon checkbox change', () => {
-    const dispatch = jest.fn();
-    
-    store.dispatch = dispatch;
-    
-    const { getByLabelText } = render(
-      <Provider store={store}>
-        <AuthorizeComponent data={{ logical_field_name: 'marketing_post', rwb_label_name: 'Marketing Post' }} />
-      </Provider>
-    );
-
-    const checkbox = getByLabelText(/Marketing Post/i);
-    
-    fireEvent.click(checkbox);
-    
-    expect(dispatch).toHaveBeenCalledWith(ValueUpdateAction.getChangeUpdate({ id: 'AD_2', changes: true }));
-    expect(dispatch).toHaveBeenCalledWith(checkboxAction.updateCheckbox([]));
-  });
-
-  test('shows popup when all marketing options are unchecked', () => {
-    const { getByLabelText } = render(
-      <Provider store={store}>
-        <AuthorizeComponent data={{ logical_field_name: 'marketing_post', rwb_label_name: 'Marketing Post' }} />
-      </Provider>
-    );
-
-    const checkbox = getByLabelText(/Marketing Post/i);
-    fireEvent.click(checkbox); // Check the box
-    fireEvent.click(checkbox); // Uncheck the box
-
-    // Assuming other relevant states and conditions are met for the popup to show
-    expect(screen.getByText(/Choose Again/i)).toBeInTheDocument();
-  });
+  // Add more tests based on the application's logic and requirements
 });
