@@ -1,66 +1,193 @@
-import { AppDispatch } from "../../../services/common-service";
-import { FindIndex } from "../../../utils/common/change.utils";
-import { KeyWithAnyModel, StageDetails } from "../../../utils/model/common-model";
-import { taxStoreModel } from "../../../utils/model/common-model"
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { KeyWithAnyModel, StoreModel } from "../../../utils/model/common-model";
+import "./button.scss";
+import { getFields } from "./button.utils";
+import renderComponent from "../../../modules/dashboard/fields/renderer";
+import {
+  fieldIdAppend,
+  getUrl,
+  isFieldUpdate,
+} from "../../../utils/common/change.utils";
+import { convertPinyin } from "../../../services/common-service";
+import { CONSTANTS } from "../../../utils/common/constants";
+import { stagesAction } from "../../../utils/store/stages-slice";
+import trackEvents from "../../../services/track-events";
 
+export const Button = (props: KeyWithAnyModel) => {
+  const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
 
-export const getFields = (getStages: Array<StageDetails>, taxSelector: taxStoreModel, action: string): any => {
-    return (dispatch: AppDispatch) => {
-        let fields: Array<KeyWithAnyModel> | undefined;
+  const taxSelector = useSelector((state: StoreModel) => state.tax);
 
-        const stageId = getStages[0] && getStages[0].stageId;
-        const stageIndex = FindIndex(getStages[0] && getStages[0].stageInfo, stageId);
-        fields = getStages[0] && getStages[0].stageInfo.fieldMetaData.data.stages[stageIndex].fields;
-        let newFileds: Array<KeyWithAnyModel> = [];
+  const addressSelector = useSelector(
+    (state: StoreModel) => state.stages.userInput
+  );
 
-        let getClonedField = (logical_field_name: string) => {
-            if (fields) {
-                let field = fields.find(field => field.logical_field_name === logical_field_name);
-                if (field && field.logical_field_name) {
-                    return { ...field };
-                } else {
-                    return null;
-                }
-            } else {
-                return null;
-            }
-        }
+  const dispatch = useDispatch();
+  const [field, setField] = useState([]);
 
-        let country_of_tax_residence = getClonedField('country_of_tax_residence');
-        let tax_id_no = getClonedField('tax_id_no');
-
-        const getSequence = () => {
-            for (let i = 1; i <= taxSelector.maxCount; i++) {
-                let isItemFound = false;
-                taxSelector.fields.forEach((field: string, index: number) => {
-                    if (
-                        field &&
-                        field.split("_")[4] === i.toString() &&
-                        index % 2 === 0
-                    ) {
-                        isItemFound = true;
-                    }
-                });
-                if (!isItemFound) {
-                    return i;
-                }
-            }
-        };
-
-        taxSelector && taxSelector.fields && taxSelector.fields.forEach((field: string) => {
-            if (
-                field &&
-                field.split("_")[0] === "country" &&
-                country_of_tax_residence
-            ) {
-                country_of_tax_residence.logical_field_name = field;
-                newFileds.push({ ...country_of_tax_residence });
-            } else if (field.split("_")[0] === "tax" && tax_id_no) {
-                tax_id_no.logical_field_name = field;
-                newFileds.push({ ...tax_id_no });
-            }
-        });
-
-        return newFileds;
+  const userInput = (fieldName: string) => {
+    switch (fieldName) {
+      case "add_tax_residence":
+        addTaxDetails();
+        break;
+      case "pinyin_res":
+        pinyinConvert("residential_address");
+        break;
+      case "pinyin_mailing":
+        pinyinConvert("mailing_address");
+        break;
+      default:
+        break;
     }
-}
+  };
+
+  const addTaxDetails = () => {
+    const stageComponents = dispatch(
+      getFields(stageSelector, taxSelector, "add")
+    );
+    setField(stageComponents);
+    trackEvents.triggerAdobeEvent(
+      "ctaClick",
+      "+ Add Tax Residence of other country/region"
+    );
+  };
+
+  const pinyinConvert = (fieldName: string) => {
+    const maxLength: Number = 30;
+    const appRef = getUrl.getChannelRefNo().applicationRefNo;
+
+    let payload = {
+      AddressLine1:
+        fieldName === "residential_address"
+          ? addressSelector.applicants[0].res_name_of_street_1
+            ? addressSelector.applicants[0].res_name_of_street_1
+            : ""
+          : addressSelector.applicants[0].res_name_of_street_3
+          ? addressSelector.applicants[0].res_name_of_street_3
+          : "",
+      AddressLine2:
+        fieldName === "residential_address"
+          ? addressSelector.applicants[0].res_building_estate_1
+            ? addressSelector.applicants[0].res_building_estate_1
+            : ""
+          : addressSelector.applicants[0].res_building_estate_3
+          ? addressSelector.applicants[0].res_building_estate_3
+          : "",
+      AddressLine3:
+        fieldName === "residential_address"
+          ? addressSelector.applicants[0].res_room_flat_1
+            ? addressSelector.applicants[0].res_room_flat_1
+            : ""
+          : addressSelector.applicants[0].res_room_flat_3
+          ? addressSelector.applicants[0].res_room_flat_3
+          : "",
+      AddressType: fieldName === "residential_address" ? "RES" : "MAILING",
+      applnrefno: appRef,
+      country: "HK",
+    };
+
+    dispatch(convertPinyin(payload)).then(async (response: KeyWithAnyModel) => {
+      if (response) {
+        dispatch(stagesAction.updatePinyinToggle());
+        // const nonChineseRegexPattern = /([^A-Za-z\d.()/&#,:?-\s]+)/;
+        if (fieldName === "residential_address") {
+          dispatch(
+            isFieldUpdate(
+              props,
+              response.AddressLine1.substr(0, maxLength),
+              CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_2
+            )
+          );
+          dispatch(
+            isFieldUpdate(
+              props,
+              response.AddressLine2.substr(0, maxLength),
+              CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_2
+            )
+          );
+          dispatch(
+            isFieldUpdate(
+              props,
+              response.AddressLine3.substr(0, maxLength),
+              CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_2
+            )
+          );
+        } else {
+          dispatch(
+            isFieldUpdate(
+              props,
+              response.AddressLine1.substr(0, maxLength),
+              CONSTANTS.LOGICAL_FIELD_NAMES.RES_NAME_OF_STREET_4
+            )
+          );
+          dispatch(
+            isFieldUpdate(
+              props,
+              response.AddressLine2.substr(0, maxLength),
+              CONSTANTS.LOGICAL_FIELD_NAMES.RES_BUILDING_ESTATE_4
+            )
+          );
+          dispatch(
+            isFieldUpdate(
+              props,
+              response.AddressLine3.substr(0, maxLength),
+              CONSTANTS.LOGICAL_FIELD_NAMES.RES_ROOM_FLAT_4
+            )
+          );
+        }
+      }
+    });
+    trackEvents.triggerAdobeEvent(
+      "ctaClick",
+      `Convert to Pinyin: ${fieldName}`
+    );
+  };
+
+  useEffect(() => {
+    if (stageSelector) {
+      const stageComponents = dispatch(
+        getFields(stageSelector, taxSelector, "get")
+      );
+      setField(stageComponents);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taxSelector]);
+
+  return (
+    <>
+      {field &&
+        field.map((currentSection: KeyWithAnyModel, index: number) => {
+          return renderComponent(
+            currentSection,
+            index,
+            props.handleCallback,
+            props.handleFieldDispatch,
+            props.value
+          );
+        })}
+      <div className="div-btn">
+        {props && props.data && (
+          <input
+            data-testid="button"
+            type="button"
+            name={props.data.logical_field_name}
+            aria-label={props.data.logical_field_name}
+            id={fieldIdAppend(props)}
+            placeholder={props.data.rwb_label_name}
+            value={props.data.rwb_label_name}
+            pattern={props.data.regex}
+            className={
+              taxSelector && taxSelector.count < taxSelector.maxCount
+                ? "show-btn, button"
+                : "hide-btn"
+            }
+            onClick={() => userInput(props.data.logical_field_name)}
+          />
+        )}
+      </div>
+    </>
+  );
+};
+
+export default Button;
