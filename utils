@@ -1,243 +1,96 @@
-import { errorAction } from "../utils/store/error-slice";
-import { AppDispatch, dispatchError, dispatchLoader } from "./common-service";
+import React from "react";
+import { render } from "@testing-library/react";
+import { Provider } from "react-redux";
+import configureStore from "redux-mock-store"; // Mock store
+import axios from "axios";
+import MockAdapter from "axios-mock-adapter"; // To mock axios
+import * as utils from "../path/to/your/utils"; // Adjust the import path for your utility file
+import { YourComponent } from "../path/to/your/components"; // Adjust based on your components
 
-export const exceptionCheck = (response: any): any => {
-  return async (dispatch: AppDispatch) => {
-    const errors =
-      response.data &&
-        response.data.application &&
-        response.data.application.errors
-        ? response.data.application
-        : "";
-    let responseAction =
-      response.data &&
-        response.data.application &&
-        response.data.application.response_action
-        ? response.data.application.response_action.toUpperCase()
-        : "";
-    let responseType =
-      response.data &&
-        response.data.application &&
-        response.data.application.response_type
-        ? response.data.application.response_type.toUpperCase()
-        : "";
-    const application_reference = response.data &&
-      response.data.application &&
-      response.data.application.application_reference
-      ? response.data.application.application_reference : "";
-    let error: any = [];
+const mockStore = configureStore([]);
+const mockAxios = new MockAdapter(axios);
 
-    if (response.status === 200 || response.status === 201) {
-      if (responseAction && responseType) {
-        switch (responseAction) {
-          case "CONTINUE":
-            if (responseType === "INFO" || responseType === "SOFT") {
-              return Promise.resolve(response);
-            }
-            break;
-          case "SUCCESS":
-            if (responseType === "INFO" || responseType === "SOFT") {
-              return Promise.resolve(response);
-            }
-            break;
-          case "RESUBMIT":
-            if (errors && errors.errors && errors.errors.length > 0) {
-              error = {
-                response: {
-                  error_header: "Please try again !",
-                  error_header_CN: "请再试一次 !",
-                  error_header_HK: "請再試一次 !",
-                  errorList: errors,
-                  error_button: "Retry",
-                  error_button_CN: "重试",
-                  error_button_HK: "重試",
-                  error_type: "Retry",
-                  status: "error",
-                  error_appRefNo: application_reference
-                },
-              };
-            } else {
-              error = {
-                response: {
-                  error_header: "Please try again !",
-                  error_header_CN: "请再试一次 !",
-                  error_header_HK: "請再試一次 !",
-                  errorList: [
-                    {
-                      detail:
-                        "We have encountered a technical issue. Please try again.",
-                      detail_CN:
-                        "网页发生错误，请再试一次并重新提交.",
-                      detail_HK:
-                        "網頁發生錯誤，請再試一次並重新提交.",
-                    },
-                  ],
-                  error_button: "Retry",
-                  error_button_CN: "重试",
-                  error_button_HK: "重試",
-                  error_type: "Retry",
-                  status: "error",
-                  error_appRefNo: application_reference
-                },
-              };
-            }
-            dispatch(errorAction.getRetryStatus(true));
-            dispatch(errorAction.getExceptionList(error.response));
-            dispatch(dispatchLoader(false));
-            return Promise.reject("Rejected");
-          case "CORRECT":
-            if (responseType === "INFO" || responseType === "SOFT") {
-              return Promise.resolve(response);
-            }
-            break;
-          case "CORRECT AND RESUBMIT":
-            if (errors && errors.errors && errors.errors.length > 0) {
-              error = {
-                response: {
-                  error_header: "Please try again !",
-                  error_header_CN: "请再试一次 !",
-                  error_header_HK: "請再試一次 !",
-                  errorList: errors,
-                  error_button: "Review",
-                  error_button_CN: "审查",
-                  error_button_HK: "審查",
-                  error_type: "back",
-                  status: "error",
-                  error_appRefNo: application_reference
-                },
-              };
-            } else {
-              error = {
-                response: {
-                  error_header: "Please try again !",
-                  error_header_CN: "请再试一次 !",
-                  error_header_HK: "請再試一次 !",
-                  errorList: [
-                    {
-                      detail:
-                        "We have encountered a technical issue. Please try again.",
-                      detail_CN:
-                        "网页发生错误，请再试一次并重新提交.",
-                      detail_HK:
-                        "網頁發生錯誤，請再試一次並重新提交.",
-                    },
-                  ],
-                  error_button: "Review",
-                  error_button_CN: "审查",
-                  error_button_HK: "審查",
-                  error_type: "back",
-                  status: "error",
-                  error_appRefNo: application_reference
-                },
-              };
-            }
-            dispatch(errorAction.getRetryStatus(true));
-            dispatch(errorAction.getExceptionList(error.response));
-            dispatch(dispatchLoader(false));
-            return Promise.reject("Rejected");
+describe('Your Code Tests', () => {
+    let store;
 
-          case "STOP":
-            if (responseType === "HARD") {
-              if (errors && errors.errors && errors.errors.length > 0) {
-                error = {
-                  response: {
-                    error_header: "Something went wrong!",
-                    error_header_CN: "出问题了!",
-                    error_header_HK: "出現問題!",
-                    errorList: errors,
-                    error_button: "Ok",
-                    error_button_CN: "确认",
-                    error_button_HK: "確認",
-                    error_type: "CancelApplication",
-                    status: "error",
-                    error_appRefNo: application_reference
-                  },
-                };
-              } else {
-                error = {
-                  response: {
-                    error_header: "",
-                    error_header_CN: "",
-                    error_header_HK: "",
-                    errorList: [
-                      {
-                        detail:
-                          "Sorry, we are unable to process your request. Please try again later",
-                        detail_CN:
-                          "抱歉，我们无法继续处理您的申请。請稍後再試。",
-                        detail_HK:
-                          "抱歉，我們無法繼續處理您的申請。請稍後再試。",
-                      },
-                    ],
-                    error_button: "Ok",
-                    error_button_CN: "确认",
-                    error_button_HK: "確認",
-                    error_type: "CancelApplication",
-                    status: "error",
-                    error_appRefNo: application_reference
-                  },
-                };
-              }
-            }
-            dispatch(errorAction.getExceptionList(error.response));
-            dispatch(dispatchLoader(false));
-            return Promise.reject("Rejected");
-          case "FAIL":
-            if (responseType === "HARD") {
-              if (errors && errors.errors && errors.errors.length > 0) {
-                error = {
-                  response: {
-                    error_header: "Something went wrong!",
-                    error_header_CN: "出问题了!",
-                    error_header_HK: "出現問題!",
-                    errorList: errors,
-                    error_button: "Ok",
-                    error_button_CN: "确认",
-                    error_button_HK: "確認",
-                    error_type: "CancelApplication",
-                    status: "error",
-                    error_appRefNo: application_reference
-                  },
-                };
-              } else {
-                error = {
-                  response: {
-                    error_header: "",
-                    error_header_CN: "",
-                    error_header_HK: "",
-                    errorList: [
-                      {
-                        detail:
-                          "Sorry, we are unable to process your request. Please try again later",
-                        detail_CN:
-                          "抱歉，我们无法继续处理您的申请。請稍後再試。",
-                        detail_HK:
-                          "抱歉，我們無法繼續處理您的申請。請稍後再試。",
-                      },
-                    ],
-                    error_button: "Ok",
-                    error_button_CN: "确认",
-                    error_button_HK: "確認",
-                    error_type: "CancelApplication",
-                    status: "error",
-                    error_appRefNo: application_reference
-                  },
-                };
-              }
-            }
-            dispatch(errorAction.getExceptionList(error.response));
-            dispatch(dispatchLoader(false));
-            return Promise.reject("Rejected");
-          default:
-            dispatch(dispatchError(error));
-            return Promise.reject("Rejected");
-        }
-      } else {
-        return Promise.resolve(response);
-      }
-    } else {
-      dispatch(dispatchError(error));
-      return Promise.reject("Rejected");
-    }
-  };
-};
+    beforeEach(() => {
+        store = mockStore({
+            // Initial state values as needed
+        });
+    });
+
+    afterEach(() => {
+        mockAxios.reset();
+    });
+
+    it('should dispatch error action on API failure in dispatchError', async () => {
+        const expectedActions = [
+            // Define your expected actions here, e.g., errorAction.getError
+        ];
+
+        await store.dispatch(utils.dispatchError(new Error("Test error")));
+
+        const actions = store.getActions();
+        expect(actions).toEqual(expectedActions);
+    });
+
+    it('should toggle loader state with dispatchLoader', async () => {
+        const expectedLoaderAction = {
+            type: "loader/getState",
+            payload: { isFetching: true },
+        };
+
+        await store.dispatch(utils.dispatchLoader(true));
+
+        const actions = store.getActions();
+        expect(actions).toEqual([expectedLoaderAction]);
+
+        await store.dispatch(utils.dispatchLoader(false));
+        const stopLoaderAction = {
+            type: "loader/getState",
+            payload: { isFetching: false },
+        };
+        expect(store.getActions()).toEqual([expectedLoaderAction, stopLoaderAction]);
+    });
+
+    it('should make API call and handle response in getLovData', async () => {
+        const mockData = [{ CODE_DESC: 'Test', CODE_VALUE: '123' }];
+        mockAxios.onGet(/lovRef/).reply(200, mockData);
+        
+        await store.dispatch(utils.getLovData("fieldName"));
+
+        const actions = store.getActions();
+
+        expect(actions).toContainEqual(
+            utils.lovAction.getLovData({ label: "fieldName", value: mockData })
+        );
+    });
+
+    it('should handle POST request in postRequest', async () => {
+        const postData = { key: 'value' };
+        const mockResponse = { data: { application: { journey_type: "example" } } };
+        mockAxios.onPost(/SAVE/).reply(200, mockResponse);
+
+        await store.dispatch(utils.postRequest(postData, {}, "someStageId", null));
+
+        const actions = store.getActions();
+
+        expect(actions).toContainEqual(
+            utils.stagesAction.setJourneyType("example")
+        );
+    });
+
+    it('should handle resumeRequest API call', async () => {
+        const mockResponse = { data: { application: { channel_reference: "channelRef" } } };
+        mockAxios.onGet(/RESUME/).reply(200, mockResponse);
+
+        await store.dispatch(utils.resumeRequest("someAppRef"));
+
+        const actions = store.getActions();
+        expect(actions).toContainEqual(
+            utils.urlParamAction.getAuthorize({ channelRefNo: "channelRef" })
+        );
+    });
+
+    // Further tests can be added similarly for other functions.
+});
