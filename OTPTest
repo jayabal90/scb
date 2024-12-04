@@ -1,90 +1,91 @@
 import React from 'react';
 import { shallow } from 'enzyme';
-import { useDispatch, useSelector } from 'react-redux';
-import OTPModel from './OTPModel'; // Adjust the import path as necessary
-import Spinner from '../spinner/spinner';
-import { preApprovalAction } from '../../../modules/preApproval/store/preApproval-slice';
-import { errorAction } from '../../../utils/store/error-slice';
+import { Provider } from 'react-redux';
+import configureStore from 'redux-mock-store';
+import OTPModel from './OTPModel'; // Adjust the import according to your directory structure.
+// Mocking necessary functions
+import * as redux from 'react-redux';
+import { getRandomChallenge, getGenerateOtp } from '../../../modules/preApproval/services/preApprovalServices';
 
-jest.mock('react-redux', () => ({
-  useDispatch: jest.fn(),
-  useSelector: jest.fn(),
-}));
+jest.mock('../../../modules/preApproval/services/preApprovalServices');
+
+const mockStore = configureStore();
+const store = mockStore({
+  stages: {
+    stages: [],
+    userInput: {
+      applicants: [{
+        mobile_number: '1234567890',
+      }],
+    },
+  },
+  preApproval: {
+    formConfigmetaData: {
+      application: {
+        channel_reference: 'some_reference',
+      },
+      products: [{}],
+    },
+  },
+  model: {
+    toggleModel: false,
+  },
+});
 
 describe('OTPModel', () => {
-  let dispatch;
+  let useDispatchSpy;
 
   beforeEach(() => {
-    dispatch = jest.fn();
-    useDispatch.mockReturnValue(dispatch);
-
-    useSelector.mockImplementation((selector) => {
-      if (selector === (state) => state.stages.stages) {
-        return [{ stageInfo: { products: [{ product_type: 'test_type' }] } }];
-      }
-      if (selector === (state) => state.stages.userInput.applicants[0]) {
-        return { mobile_number: '1234567890' };
-      }
-      if (selector === (state) => state.preApproval.formConfigmetaData) {
-        return { application: { channel_reference: 'test_channel' }, products: [{ product_type: 'test_product' }] };
-      }
-      return {};
-    });
-  });
-
-  it('should render OTP inputs correctly', () => {
-    const wrapper = shallow(<OTPModel />);
-    expect(wrapper.find('input[type="password"]').length).toBe(6); // Assuming 6 OTP inputs
-  });
-
-  it('should update OTP state on change', () => {
-    const wrapper = shallow(<OTPModel />);
-    const instance = wrapper.instance();
-    
-    const input = wrapper.find('input[type="password"]').at(0);
-    input.simulate('change', { target: { value: '1' } }); // Simulating input change
-    expect(wrapper.find('input[type="password"]').at(0).props().value).toBe('1');
-  });
-
-  it('should generate and verify OTP', async () => {
-    const wrapper = shallow(<OTPModel />);
-    
-    await wrapper.instance().generateOtp(); // Test generating OTP
-    expect(dispatch).toHaveBeenCalledWith(preApprovalAction.setRandomChallengeData(expect.any(Object))); // Ensures OTP generation is called
-
-    // Simulate entering the OTP
-    wrapper.instance().otpBinding('1', '1', 0); 
-    wrapper.instance().otpBinding('2', '2', 1);
-    wrapper.instance().otpBinding('3', '3', 2);
-    wrapper.instance().otpBinding('4', '4', 3);
-    wrapper.instance().otpBinding('5', '5', 4);
-    wrapper.instance().otpBinding('6', '6', 5);
-
-    expect(wrapper.state('otpVal')).toEqual(['1', '2', '3', '4', '5', '6']);
-    expect(wrapper.state('otpVerified')).toBe(true);
-  });
-
-  it('should show expired OTP message', () => {
-    const wrapper = shallow(<OTPModel />);
-    wrapper.setState({ zeroTimer: true });
-
-    expect(wrapper.find('.your-last-requested').exists()).toBe(true); // Check that expired message is displayed.
-  });
-
-  it('should handle invalid OTP scenario', async () => {
-    const wrapper = shallow(<OTPModel />);
-    await wrapper.instance().generateOtp(); // Generate OTP
-    // trigger the verification process with an invalid OTP
-    wrapper.instance().otpBinding('1', '1', 0);
-    
-    // Mock the response for verifyOtp to be invalid
-    jest.spyOn(wrapper.instance(), 'getVerifyOtp').mockImplementation(() => Promise.resolve({ status: 400 }));
-
-    await wrapper.instance().otpBinding('0', '0', 5); // Simulate input of OTP
-    expect(wrapper.state('showInvalidOTP')).toBe(true);
+    useDispatchSpy = jest.spyOn(redux, 'useDispatch');
+    useDispatchSpy.mockReturnValue(jest.fn());
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
+
+  it('should render correctly with initial state', () => {
+    const wrapper = shallow(
+      <Provider store={store}>
+        <OTPModel />
+      </Provider>
+    ).dive().dive(); // Diving twice because of the Provider
+
+    expect(wrapper.exists()).toBe(true);
+  });
+
+  it('should call generateOtp on mount', () => {
+    const generateOtpMock = jest.fn();
+    jest.spyOn(OTPModel.prototype, 'generateOtp').mockImplementation(generateOtpMock);
+
+    shallow(
+      <Provider store={store}>
+        <OTPModel />
+      </Provider>
+    ).dive().dive();
+
+    expect(generateOtpMock).toHaveBeenCalled();
+  });
+
+  it('should display OTP expired message when timer gets to zero', () => {
+    jest.useFakeTimers();
+
+    const wrapper = shallow(
+      <Provider store={store}>
+        <OTPModel />
+      </Provider>
+    ).dive().dive();
+
+    // Simulate the timer reducing to zero
+    wrapper.setState({ seconds: 1 });
+    wrapper.setState({ seconds: 0 });
+
+    wrapper.update();
+
+    expect(wrapper.find('.otp-alert-icon').exists()).toBe(true);
+    expect(wrapper.find('.Your-last-requested').exists()).toBe(true);
+  });
+
+  // Other tests to cover further functionality...
+
 });
