@@ -1,738 +1,302 @@
-import { nextStage } from "../modules/dashboard/fields/stage.utils";
-import {
-  FindIndex,
-  getUrl,
-} from "../utils/common/change.utils";
-import { CONSTANTS } from "../utils/common/constants";
-import {
-  FormConfigModel,
-  KeyWithAnyModel,
-  MyinfoNoResponseModel,
-  UserFields,
-} from "../utils/model/common-model";
-import axios, { AxiosError } from "axios";
-import { errorAction } from "../utils/store/error-slice";
-import { loaderAction } from "../utils/store/loader-slice";
-import { lovAction } from "../utils/store/lov-slice";
-import { stagesAction } from "../utils/store/stages-slice";
+import { getUrl } from "../utils/common/change.utils";
 import { store } from "../utils/store/store";
-import { urlParamAction } from "../utils/store/urlparam-slice";
-import { ValueUpdateAction } from "../utils/store/value-update-slice";
-import { exceptionCheck } from "./exception-handling-utils";
-import generatePayload from "./payload";
-import submitService from "./submit-service";
-import {  ibankEncryptMock, ibankRegisterUserDataMock } from "../assets/_mock-data/authorize-mock"; //Added for mock json for authorize call till csl integration
-import encrypt from "../services/encryption";
-import { pendingApplicationAction } from "../utils/store/pendingApplication-slice";
-import { lovDescAction } from "../utils/store/lov-desc-slice";
+import { KeyWithAnyModel } from "../utils/model/common-model";
+import { getUserType, getErrorType, loginval, getStepName, getDeviceTypes } from '../utils/adobe/constants';
 
-export type AppDispatch = typeof store.dispatch;
+class service {
 
-export const dispatchError = (error: AxiosError | MyinfoNoResponseModel) => {
-  return (dispatch: AppDispatch) => {
-    dispatch(dispatchLoader(false));
-    if (error && error.response) {
-      dispatch(
-        errorAction.getError({
-          statusCode: error.response.status,
-          statusText: error.response.statusText,
-        })
-      );
-    } else {
-      dispatch(
-        errorAction.getError({
-          statusCode: "error",
-          statusText: "no response",
-        })
-      );
-    }
-  };
-};
-
-/**
- * Used to show loader indicator while making API request.
- * @param loader sending Boolean flag to show/hide loader
- * @returns
- */
-export const dispatchLoader = (loader: boolean): any => {
-  return (dispatch: AppDispatch) => {
-    dispatch(
-      loaderAction.getState({
-        isFetching: loader,
-      })
-    );
-  };
-};
-
-/**
- * LOV API request
- * @param field Based on logical field initiating LOV API request
- * @returns
- */
-export const getLovData = (field: string, searchKey?: string, cityKey?: any, resumeFlag?: any, resData?: any): any => {
-  const baseUrl = `${process.env.REACT_APP_RTOB_BASE_URL}`;
-  const lovRef = process.env.REACT_APP_RTOB_LOVREF;
-  const formType = process.env.REACT_APP_RTOB_FORMTYPE;
-  const endpoint = searchKey
-    ? `${lovRef + field + formType}&size=25&q=${searchKey}`
-    : cityKey ? `${lovRef + field + formType}&nestedFieldName=${cityKey}` : `${lovRef + field}`;
-
-  const url = baseUrl + endpoint;
-
-  return async (dispatch: AppDispatch) => {
-    try {
-      const res = await axios.get(url);
-      if (res.data) {
-        const refValue = res.data
-        if(refValue.length > 0) {
-            const removedDuplicatesRefValue = refValue.filter((refValue: KeyWithAnyModel, index: number, self: KeyWithAnyModel) =>
-              index === self.findIndex((t: KeyWithAnyModel) => (t.CODE_DESC === refValue.CODE_DESC && t.CODE_VALUE === refValue.CODE_VALUE)))
-            dispatch(
-              lovAction.getLovData({
-                label: field,
-                value: removedDuplicatesRefValue,
-              })
-            );
+    getFormFieldValue = (labelName: string, stage: KeyWithAnyModel, lov: string) => {
+        let finalValue = 'na';
+        let stageApplicant = labelName.concat('_a_1')
+        let value = (stage.stages.userInput && stage.stages.userInput.applicants) ? stage.stages.userInput.applicants[stageApplicant] : null;
+        if (!value) {
+            value = (stage.stages.stages[0].stageInfo.applicants) ? stage.stages.stages[0].stageInfo.applicants[stageApplicant] : null;
         }
-        if(resumeFlag) {
-          if(refValue.length > 0 && resData.applicants[0][field]) {
-            const filterData = refValue.filter((refValue: KeyWithAnyModel) => 
-            (refValue.CODE_VALUE === resData.applicants[0][field]))
-            dispatch(
-              lovDescAction.addLovData({
-                fieldData: {
-                  fieldName: field,
-                  code_desc: filterData[0].CODE_DESC,
-                  code_value: filterData[0].CODE_VALUE
-                }
-              })
-            );
-          }
-        }
-        return await Promise.resolve(res);
-      } else {
-        defaultError();
-      }
-    } catch (err: any) {
-      /**Commented for local setup */
-      dispatch(dispatchError(err));
-      return await Promise.reject(err.response);
-    }
-  };
-};
-
-export const postRequest = (
-  data: any,
-  currentStageFields: any,
-  currentStageId: string,
-  applicationJourney: string | null,
-  stageSelectorApplicants?: any,
-): any => {
-  const baseUrl = `${process.env.REACT_APP_RTOB_BASE_URL}`;
-  const createEndPoint = `${process.env.REACT_APP_RTOB_CREATE_END_POINT}`;
-  const basicEndPoint = `${process.env.REACT_APP_RTOB_BASIC_END_POINT}`;
-  const partnerVerifyEndPoint = `${process.env.REACT_APP_RTOB_PARTNER_VERIFY_END_POINT}`;
-  const saveEndPoint = `${process.env.REACT_APP_RTOB_SAVE_END_POINT}`;
-  const applyEndPoint = `${process.env.REACT_APP_RTOB_APPLY_END_POINT}`;
-  const confirmEndPoint = `${process.env.REACT_APP_RTOB_CONFIRM_END_POINT}`;
-  const application = `${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}`;
-  const channelRefNo = getUrl.getChannelRefNo().channelRefNo;
-  const applicationRefNo = getUrl.getChannelRefNo().applicationRefNo;
-  const saveUrl = `${application + channelRefNo + saveEndPoint}`;
-  const createUrl = `${application + channelRefNo + createEndPoint}`;
-  const basicDataUrl = `${application + channelRefNo + basicEndPoint}`;
-  const partnerVerifyUrl = `${application + channelRefNo + partnerVerifyEndPoint}`;
-  const applyUrl = `${application + channelRefNo + applyEndPoint}`;
-  const confirmUrl = `${application + channelRefNo + confirmEndPoint}`;
-  let url = baseUrl + saveUrl;
-  if (currentStageId === CONSTANTS.STAGE_NAMES.SSF_1) {
-    url = baseUrl + createUrl;
-  } else if (currentStageId === CONSTANTS.STAGE_NAMES.BD_3) {
-    url = baseUrl + basicDataUrl;
-  } else if (currentStageId === CONSTANTS.STAGE_NAMES.BD_2) {
-    url = baseUrl + partnerVerifyUrl;
-  } else if (currentStageId === CONSTANTS.STAGE_NAMES.AD_2) {
-    url = baseUrl + applyUrl;
-  } else if (currentStageId === CONSTANTS.STAGE_NAMES.RP) {
-    url = baseUrl + confirmUrl;
-  }
-
-  /* Skip Preserve call in ibank registration*/
-  if (currentStageId === CONSTANTS.STAGE_NAMES.AD_3) {
-    return async (dispatch: AppDispatch) => {
-      const stageTo = nextStage(currentStageId, applicationJourney);
-      dispatch(stagesAction.updateStageId(stageTo));
-      dispatch(lovRequests(data.stageInfo, stageTo));
-      return Promise.resolve();
-    }
-  }
-
-  let payload = generatePayload.createPayload(data, currentStageFields, url, stageSelectorApplicants, 'NORESUME');
-
-  return async (dispatch: AppDispatch) => {
-    dispatch(dispatchLoader(true));
-    try {
-      let res: any;
-      await dispatch(exceptionCheck(await axios.post(url, payload))).then(
-        (response: any) => {
-          if (response !== "Rejected") {
-            res = response;
-            if (res) {
-              if (res.data) {
-                dispatch(
-                  stagesAction.setJourneyType(res.data.application.journey_type)
-                );
-              }
-              if (!applicationRefNo && res.data) { dispatch(urlParamAction.getAuthorize({ "applicationRefNo": res.data.application.application_reference })) }
-              if (!applicationJourney) {
-                // dispatch(stagesAction.deleteStageInput())
-                dispatch(
-                  stagesAction.setJourneyType(res.data.application.journey_type)
-                );
-                applicationJourney = res.data.application.journey_type;
-              }
-              const stageTo = nextStage(currentStageId, applicationJourney);
-              dispatch(stagesAction.updateStageId(stageTo));
-              dispatch(lovRequests(data.stageInfo, stageTo));
-              return Promise.resolve(res);
-            }
-          }
-        }
-      );
-    } catch (error: any) {
-      /* commented for local setup */
-      if (error !== "Rejected") {
-        dispatch(dispatchError(error));
-      }
-      return await Promise.reject(error.response);
-      /* commented for local setup */
-    }
-  };
-};
-
-/**
- * Initiating Lov data request if myinfo/manual form-config request completed
- */
-
-export const lovRequests = (
-  res: any,
-  isBdStage: string,
-  missingFields?: any,
-  resumeFlag?: any
-): any => {
-  return (dispatch: AppDispatch) => {
-    if (res) {
-      const requestAll = async () => {
-        let currentStage = [isBdStage];
-        console.log(currentStage)
-        // Passing an array of promises that are already resolved to trigger Promise.all as soon as possible
-        let resolvedLov: any = [];
-        currentStage.forEach(async (stage: string) => {
-          console.log(res, stage)
-          const index = FindIndex(res, stage === 'ld-1' ? "ad-11" : stage);
-          console.log(index)
-          if (res.fieldMetaData.data.stages[index]) {
-            res.fieldMetaData.data.stages[index].fields.map(
-              async (lov: KeyWithAnyModel) => {
-                try {
-                  if(!resumeFlag) {
-                    if (isBdStage !== CONSTANTS.STAGE_NAMES.RP) {
-                      if (lov.lov === "Yes" && (isBdStage !== "bd-5")) {
-                        if (isBdStage !== CONSTANTS.STAGE_NAMES.BD_3 && isBdStage !== CONSTANTS.STAGE_NAMES.AD_1) {
-                          console.log('lov.component_type--',lov.component_type, '--lov--',lov)
-                          if (lov.lov === "Yes" && lov.rwb_category === isBdStage) {
-                            if(lov.component_type === 'Text' || lov.component_type === 'Selection Box' || lov.component_type === 'Radio With Label' || lov.component_type === 'short-text' || lov.component_type === 'Phone' || lov.component_type === 'Multi Selection Box'){
-                              resolvedLov.push(
-                                dispatch(getLovData(lov.logical_field_name))
-                              );
-                            }
-                            
-                          }
-                        } else if (isBdStage === CONSTANTS.STAGE_NAMES.BD_3
-                          && (lov.logical_field_name !== CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE)
-                          && (lov.logical_field_name !== CONSTANTS.LOGICAL_FIELD_NAMES.SUPPLEMENTARY_INVEST_EXPERINECE)
-                          && (lov.logical_field_name !== CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT)
-                          && (lov.logical_field_name !== CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_PRODUCT_2)
-                        ) {
-                          resolvedLov.push(
-                            dispatch(getLovData(lov.logical_field_name))
-                          );
-                        } 
-                        else if (isBdStage === CONSTANTS.STAGE_NAMES.AD_1
-                          && (lov.logical_field_name !== CONSTANTS.LOGICAL_FIELD_NAMES.COUNTRY_OF_TAX_RESIDENCE + "_1")
-                          && (lov.logical_field_name !== CONSTANTS.LOGICAL_FIELD_NAMES.COUNTRY_OF_TAX_RESIDENCE + "_2")
-                          && (lov.logical_field_name !== CONSTANTS.LOGICAL_FIELD_NAMES.COUNTRY_OF_TAX_RESIDENCE + "_3")
-                          && (lov.logical_field_name !== CONSTANTS.LOGICAL_FIELD_NAMES.COUNTRY_OF_TAX_RESIDENCE + "_4")
-                        ) 
-                        {
-                          resolvedLov.push(
-                            dispatch(getLovData(lov.logical_field_name))
-                          );
+        if (value) {
+            if (lov === 'Yes') {
+                const lovData = stage.lov.lov;
+                if (lovData) {
+                    const lovValues = lovData.find((lovs: KeyWithAnyModel) => lovs.label === labelName);
+                    if (lovValues) {
+                        const lovValue = lovValues.value.find((lov: KeyWithAnyModel) => lov.CODE_VALUE === value)
+                        if (lovValue) {
+                            finalValue = lovValue.CODE_DESC;
                         }
-                      } else if (lov.lov === "Yes" && (isBdStage === "bd-5" && (lov.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1))) {
-                        resolvedLov.push(dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1)))
-                      } else if (lov.lov === "Yes" && (isBdStage === "bd-5" && (lov.logical_field_name === CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2))) {
-                        resolvedLov.push(dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.ALT_ADDRESS_SAME_AS_RES_ADDRESS_2)))
-                      }
-                      else if(lov.lov === "No" && (lov.logical_field_name === "mobile_number")) {
-                        console.log('lov.logical_field_name--',lov.logical_field_name)
-                        resolvedLov.push(
-                          dispatch(getLovData(lov.logical_field_name))
-                        );
-                      }
                     }
-                  }
-                  else {
-                    console.log(lov)
-                    if (lov.lov === "Yes" && (lov.logical_field_name !== 'tax_residence_countries' || lov.logical_field_name !== 'direct_marketing' || lov.logical_field_name !== 'acknowledgement_cert' || lov.logical_field_name !== 'client_declaration_cert' || lov.logical_field_name !== 'client_sc_consent_title')) {
-                      resolvedLov.push(
-                        dispatch(getLovData(lov.logical_field_name, '', '', resumeFlag, res))
-                      ); 
-                    } else if(lov.lov === "No" && lov.logical_field_name === 'residential_address_eng' && res.applicants[0][CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1]) {
-                      dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_1, '', '', resumeFlag, res))
-                    } else if(lov.lov === "No" && lov.logical_field_name === 'mailing_address_eng' && res.applicants[0][CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2]) {
-                      dispatch(getLovData(CONSTANTS.LOGICAL_FIELD_NAMES.RES_COUNTRY_2, '', '', resumeFlag, res))
-                    }
-
-                  }
-                } catch (err) {
-                  console.log(err);
                 }
-              }
-            );
-          }
+            } else if (lov === 'No') {
+                finalValue = value;
+            }
+
+        }
+        return finalValue;
+    }
+
+    getFormFields(stageId: string, stage: KeyWithAnyModel, logicalNames: Array<string>){
+        let formFields: Array<{}> = [];
+        logicalNames.forEach(logicalName => {
+            const currentStage = stage.stages.stages[0].stageInfo.fieldMetaData.data.stages.find((stage : KeyWithAnyModel) => stage.stageId === stageId);
+            if(currentStage){
+               const field = currentStage.fields.find( (field : KeyWithAnyModel) => field.logical_field_name === logicalName)
+                if(field){
+                    formFields.push({
+                        formFieldValue : this.getFormFieldValue(logicalName, stage, field.lov),
+                        formFieldName : this.getLabelName(field.rwb_label_name)
+                    })
+                }
+            }
+        })
+        return formFields ;
+    }
+
+    getLabelName(label: string) {
+        switch (label) {
+            case 'Tenor & monthly repayment': {
+                return 'Tenor';
+            }
+            default: {
+                return label;
+            }
+        }
+    }
+
+
+    triggerAdobeEvent = (eventName: string, buttonName?: string, docResponse?: KeyWithAnyModel, errType?: string) => {
+        const stage = store.getState();
+        const channelRef = getUrl.getChannelRefNo().channelRefNo;
+        const appRefNo = getUrl.getChannelRefNo().applicationRefNo;
+        if (stage && stage.stages && stage.stages.stages && stage.stages.stages.length > 0 && stage.stages.stages[0].stageInfo) {
+            let stepName = getStepName(stage);
+            let dataLayer: KeyWithAnyModel = this.getAdobeDataLayer(eventName, stage, stepName);
+            if (eventName !== 'popupViewed') {
+                dataLayer.form.channelRefNum = channelRef ? channelRef : 'na'
+            }
+
+            if (eventName !== 'formStart' && eventName !== 'popupViewed') {
+                dataLayer.form.refNum = appRefNo;
+                // dataLayer.form.cosReferenceID = 'na';
+            }
+            if (eventName !== 'formStart' && eventName !== 'popupViewed' && eventName !== 'formStepCompletions' && eventName !== 'formSubmit' && eventName !== 'formAbandonment' && eventName !== 'formError') {
+                dataLayer.form.formFields = [
+                    {
+                        formFieldValue: 'na',
+                        formFieldName: 'na'
+                    }]
+            }
+            if (eventName === 'pageView') {
+                dataLayer.form.refNum = appRefNo !== null ? appRefNo : 'na';
+                dataLayer.form.formFields = [
+                    {
+                        formFieldValue: 'na',
+                        formFieldName: 'na'
+                    }];
+                window.adobeDataLayer.push(dataLayer);
+            }
+            else if (eventName === 'formStart') {
+                dataLayer.page.attributes.pfm = loginval();
+                window.adobeDataLayer.push(dataLayer);
+            }
+            else if (eventName === 'ctaClick') {
+                // const popupName = errType;
+                if (buttonName === 'Continue') {
+                    const stageId = stage.stages.stages[0].stageId;
+                    // if (stageId !== 'doc') {
+                    //     dataLayer.form.formFields = this.getFormFieldsByScreenName(stage)
+                    // } else if (stageId === 'doc' && docResponse) {
+                    //     dataLayer.form.formFields = this.documentList(docResponse);
+                    // }
+                    if (stageId === 'rp') {
+                        buttonName = 'Submit';
+                    }
+                }
+                // dataLayer.form.formFields = [
+                //     {
+                //         formFieldValue: 'na',
+                //         formFieldName: 'na'
+                //     }]
+                dataLayer.customLinkClick = {
+                    'customLinkText': buttonName,
+                    'customLinkPosition': buttonName === 'Login' ? 'top' : 'bottom',
+                    'customLinkType': 'button'
+                }
+                // if(popupName){
+                //     dataLayer.form.popupName = popupName;
+                // }
+                window.adobeDataLayer.push(dataLayer);
+            }
+            else if (eventName === 'formStepCompletions') {
+                dataLayer.form.refNum = appRefNo !== null ? appRefNo : 'na';
+                dataLayer.form.formFields = [
+                    {
+                        formFieldValue: 'na',
+                        formFieldName: 'na'
+                    }];
+                window.adobeDataLayer.push(dataLayer);
+            }
+            else if (eventName === 'formSubmit' && !window.adobeDataLayer.find((eachEvent: KeyWithAnyModel) => eachEvent.event === 'formSubmit')) {
+                dataLayer.form.refNum = appRefNo !== null ? appRefNo : 'na';
+                dataLayer.form.appStatus = 'Submitted';
+                window.adobeDataLayer.push(dataLayer);
+            }
+            else if (eventName === 'formAbandonment' && !window.adobeDataLayer.find((eachEvent: KeyWithAnyModel) => ( eachEvent.event === 'formSubmit' || eachEvent.event === 'formAbandonment'))) {
+                dataLayer.form.refNum = appRefNo !== null ? appRefNo : 'na';
+                dataLayer.form.formLastAccessedField = stage.lastAccessed.fieldFocused ? stage.lastAccessed.fieldFocused : 'na';
+                dataLayer.form.formFields = [
+                    {
+                        formFieldValue: 'na',
+                        formFieldName: 'na'
+                    }];
+                dataLayer.customLinkClick = {
+                    'customLinkText': buttonName,
+                    'customLinkPosition': buttonName === 'Login' ? 'top' : 'bottom',
+                    'customLinkType': 'button'
+                }
+                window.adobeDataLayer.push(dataLayer);
+            }
+            else if (eventName === 'formError') {
+                const error = store.getState().error.errors;
+                const exception: KeyWithAnyModel = store.getState().error.exceptionList;
+                dataLayer.form.refNum = appRefNo !== null ? appRefNo : 'na';
+                if (error.length > 0) {
+                    dataLayer.error = [{
+                        errorCode: error[0].statusCode ? error[0].statusCode : exception[0].error_type ? exception[0].error_type : 'na',
+                        errorField: stepName,
+                        errorDescription: error[0].statusText ? error[0].statusText : exception[0].status ? exception[0].status : 'na'
+                    }]
+                } 
+                else if(exception && exception.errorList && exception.errorList.errors && exception.errorList.errors.length > 0){
+                    dataLayer.error = [{
+                        errorCode: exception.errorList.errors[0].code ? exception.errorList.errors[0].code : 'na',
+                        errorField: stepName,
+                        errorDescription: exception.errorList.errors[0].detail ? exception.errorList.errors[0].detail : exception.error_header
+                    }]
+                }  else {
+                    dataLayer.error = [{
+                        errorCode: 'na',
+                        errorField: stepName,
+                        errorDescription: 'na'
+                    }]
+                }
+                window.adobeDataLayer.push(dataLayer);
+            }
+            else if (eventName === 'popupViewed') {
+                const lastEvent: KeyWithAnyModel =  window.adobeDataLayer[window.adobeDataLayer.length-1];
+                if (!lastEvent || (lastEvent && lastEvent.event !== 'popupViewed')) {
+                    dataLayer.form.refNum = appRefNo !== null ? appRefNo : 'na';
+                    dataLayer.form.popupName = buttonName ? buttonName : 'na'
+                    window.adobeDataLayer.push(dataLayer);
+                }
+            }           
+    }
+}
+
+    getProductInfo = (stage: KeyWithAnyModel) => {
+        let info: Array<{}> = [];
+        let formName = '';
+        let productCategory = '';
+        let productName = '';
+        const products = stage.stages.stages[0].stageInfo.products;
+        products.forEach((product: KeyWithAnyModel) => {
+            const formNameCheck = product.product_category === 'SA' ? 'rtob_crossborder' : 'na';
+        info.push({
+                productInfo: {
+                    productName: product.name,
+                    productID: product.product_type,
+                    productCategory: product.product_category,
+                    productSubCategory: 'na',
+                }
+            });
+            info.push({
+                formInfo: {
+                        formName : formName ? (formName + '|' + formNameCheck) : formNameCheck,
+                        productCategory : productCategory ? (productCategory + '|' + product.product_category) : product.product_category,
+                      productName : productName ? (productName + '|' + product.name) : product.name
+                }
+            })
         });
-        return await Promise.all(resolvedLov);
-      };
-      return requestAll().then(() => {
-        dispatch(dispatchLoader(false));
-      });
-    }
-  };
-};
 
+    return info;
+ }      
 
-export const fieldLevelSwipe = (
-  formConfigRes: FormConfigModel
-): FormConfigModel => {
-  formConfigRes.fieldMetaData.data.stages[1].fields.sort(
-    (a: KeyWithAnyModel, b: KeyWithAnyModel) => {
-      return parseInt(a.seq_no) - parseInt(b.seq_no);
-    }
-  );
-  return formConfigRes;
-};
+    getAdobeDataLayer = (eventName: string, stage: KeyWithAnyModel, stepName: string|undefined) => {
+        const product = this.getProductInfo(stage);
+        const formInfo: KeyWithAnyModel = product[1]
+        const channelRef = getUrl.getChannelRefNo().channelRefNo;
+        const language = getUrl.getParameterByName("lang");
+        const country = stage.stages.stages[0].stageInfo.fieldMetaData.country;
+        const Curreny = language === "zh-HK" ? "HK$" : "HKD";
+        const market = 'hk';
+        let dataObject = {
+            event: eventName,
+            page: {
+                pageInfo: {
+                    pageType: 'form',
+                    pageName: market + ':' + language + ':web:wealth:cross border:greater bay area banking:GBA Southbound wealth management connect service' + (stepName === "start application process"? ':na' :  ( ':' + formInfo.formInfo.formName)) + ':' + stepName,
+                    buildDetails: `${process.env.REACT_APP_ADOBE_BUILD_DETAILS}`,
+                    libDetails: `${process.env.REACT_APP_ADOBE_LIB_DETAILS}`
+                },
+                category: {
+                    primaryCategory: formInfo.formInfo.productCategory,
+                    subCategory1: 'na'
+                },
+                attributes: {
+                    country: country,
+                    language: language,
+                    currency: Curreny,
+                    platform: getDeviceTypes(),
+                    pfm: loginval()
+                },
+            },
+            form: {
+                formName: formInfo.formInfo.formName,
+                formStepName: stepName,
+                formPlatform: 'rtob',
+                formType: 'application',
+                channelRefNum: channelRef ? channelRef : 'na',
+                cosReferenceID: 'na'
+            },
+            user: {
+                "userInfo": {
+                    userID: ( stage.stages.stages[0].stageInfo.applicants && stage.stages.stages[0].stageInfo.applicants.profile_id ) ? stage.stages.stages[0].stageInfo.applicants.profile_id : 'na',
+                    userType: stage.stages.journeyType ? getUserType(stage.stages.journeyType) : 'na',
+                    // userStatus: (stage.auth && stage.auth.SSCode) ? 'logged in' : 'guest',
+                    loginStatus: (stage.auth && stage.auth.SSCode) ? 'logged-in' : 'not logged-in',
+                    segment: 'wealth'
+                }
+            },
+            product: [product[0]]
+        };
+        return dataObject;
+}
 
-export const technicalError = (data: any) => {
-  const error = {
-    response: {
-      status: data["status-code"],
-      statusText: "no response",
-    },
-  };
-  return error;
-};
-/**
- * Used to identify whether user landed on new screen or changes observed on current screen to make API request.
- * @param data
- * @returns
- */
-export const isFormUpdate = (data: boolean | null): any => {
-  return (dispatch: AppDispatch) => {
-    dispatch(ValueUpdateAction.getValueUpdate(data));
-  };
-};
-
-export const sortByAscendingOrder = (payload: any) => {
-  let sorted_data = payload;
-  sorted_data["applicant"] = sortingList(payload["applicant"],'object');
-  sorted_data["application"] = sortingList(payload["application"],'object');
-  return sorted_data;
-};
-
-export const sortingList = (list: any,type:string) => {
-  return list && Object.keys(list)
-      .sort()
-    .reduce((accumulator: any, key: any) => {
-          accumulator[key] = list[key];
-          return accumulator;
-    },type==='array'?[]:{});
-};
-
-/**
- * To remove unwanted product details
- */
-export const filterProducDetails = () => {
-  const product = JSON.parse(JSON.stringify(getUrl.getProductInfo()));
-  product.filter((item: any) => {
-    delete item.company_category;
-    delete item.premiumCode;
-    delete item.product_title;
-    return item;
-  });
-  return product;
-};
-
-/**
- * The method used to generate the gba-generate call
- * @returns
- */
-export const gbaGenerate = (data: KeyWithAnyModel): any => {
-  const channelRefNo = getUrl.getChannelRefNo().channelRefNo;
-  let url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${channelRefNo}${process.env.REACT_APP_RTOB_GBA_GENERATE}`;
-  if (data.flowType === CONSTANTS.OTP_FLOW.RESUME)
-    url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${submitService.generateUUID}${process.env.REACT_APP_RTOB_GBA_GENERATE}`;
-  // const payload = { data };
-  return async (dispatch: AppDispatch) => {
-    dispatch(dispatchLoader(true));
-    return axios
-      .post(url, sortByAscendingOrder(data))
-      .then((response) => {
-        if (response.data) {
-          dispatch(dispatchLoader(false));
-          return Promise.resolve(response.data); //After csl integration
-        } 
-        // else {
-        //   defaultError();
-        // }
-      })
-      .catch((error) => {
-        dispatch(dispatchError(error));  //After csl integration
-        return Promise.reject(error);
-      });
-  };
-};
-
-export const dispatchPendingApplication = (pendingApplications: any): any => {
-  return (dispatch: AppDispatch) => {
-    dispatch(pendingApplicationAction.createPendingApplication(pendingApplications));
-  };
-};
-
-export const gbaVerify = (data: KeyWithAnyModel): any => {
-  const channelRefNo = getUrl.getChannelRefNo().channelRefNo;
-  let url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${channelRefNo}${process.env.REACT_APP_RTOB_GBA_VERIFY}`;
-  if (data['flow-type'] === CONSTANTS.OTP_FLOW.RESUME)
-    url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${submitService.generateUUID}${process.env.REACT_APP_RTOB_GBA_VERIFY}`;
-  // const payload = { data };
-
-  return async (dispatch: AppDispatch) => {
-    dispatch(dispatchLoader(true));
-    return axios
-      .post(url, sortByAscendingOrder(data))
-      .then((response) => {
-        if (response.status === 200) {
-          dispatch(dispatchLoader(false));
-          if (response.data && response.data["status"] === "SUCCESS" && response.data.Application) {
-            dispatch(dispatchPendingApplication(response.data.Application));
-          }
-          return Promise.resolve(response.data);    //After csl integration
-        } else {
-          defaultError();
+    atViewStart = () => {
+        const language = getUrl.getParameterByName("lang");
+        const market = 'hk';
+        this.prehideSnippet();
+        const stage = store.getState();
+        if (stage && stage.stages.stages && stage.stages.stages.length > 0 && stage.stages.stages[0].stageInfo) {
+           let formInfo: KeyWithAnyModel = this.getProductInfo(stage)[1];
+           const stepName = getStepName(stage);
+            window.adobeDataLayer.push({
+                "event": "at-view-start",
+                "page": {
+                    "pageInfo": {
+                        "pageName": market + ':' + language + ':web:wealth:cross border:greater bay area banking:GBA Southbound wealth management connect service' + (stepName === "start application process"? ':na' :  ( ':' + formInfo.formInfo.formName)) + ':' + stepName,
+                        "viewName": stepName,
+                        "primaryCategory": formInfo.formInfo.productCategory,
+                        "subCategory1": "na"
+                    }
+                }
+            });
         }
-      })
-      .catch((error) => {
-        dispatch(dispatchError(error)); //Commented for local setup
-        return Promise.reject(error);  //Commented for local setup
-      });
-  };
-};
-
-
-export const defaultError = () => {
-  return async (dispatch: AppDispatch) => {
-    const error = {
-      response: {
-        status: "error",
-        statusText: "no response",
-      },
-    };
-    dispatch(dispatchError(error));
-  };
-};
-/**
- * The method is used to check Product Details for standlone and buddles cards
- */
-
-export const checkProductDetails = (noOfProducts: KeyWithAnyModel) => {
-  let hasCC, hasPL, hasCA, hasSA, hasCASA, hasCCPL, hasOnlyCCPL, hasOnlyCASA;
-  let CAProduct, SAProduct, CCProduct, PLProduct;
-  let CAProductLength: number = 0,
-    SAProductLength: number = 0,
-    CCProductLength: number = 0,
-    PLProductLength: number = 0;
-  let returnValue;
-
-  if (noOfProducts.length === 1) {
-    CAProduct = noOfProducts[0].product_category === "CA";
-    SAProduct = noOfProducts[0].product_category === "SA";
-    CCProduct = noOfProducts[0].product_category === "CC";
-    PLProduct = noOfProducts[0].product_category === "PL";
-    if (CAProduct || SAProduct) {
-      returnValue = true;
     }
-    if (CCProduct || PLProduct) {
-      returnValue = false;
+
+    prehideSnippet = () => {
+        (function (g, b, d, f) { (function (a, c, d) { if (a) { var e = b.createElement("style"); e.id = c; e.innerHTML = d; a.appendChild(e) } })(b.getElementsByTagName("head")[0], "at-body-style", d); setTimeout(function () { var a = b.getElementsByTagName("head")[0]; if (a) { var c = b.getElementById("at-body-style"); c && a.removeChild(c) } }, f) }(window, document, "body{opacity: 1 !important}", 3E3));
     }
-  }
-  if (noOfProducts.length > 1) {
-    for (let i = 0; i < noOfProducts.length; i++) {
-      if (noOfProducts[i].product_category === "CA") {
-        CAProductLength = CAProductLength + 1;
-      }
-      if (noOfProducts[i].product_category === "SA") {
-        SAProductLength = CAProductLength + 1;
-      }
-      if (noOfProducts[i].product_category === "CC") {
-        CCProductLength = CAProductLength + 1;
-      }
-      if (noOfProducts[i].product_category === "PL") {
-        PLProductLength = CAProductLength + 1;
-      }
-    }
-    hasPL = PLProductLength >= 1;
-    hasCC = CCProductLength >= 1;
-    hasCA = CAProductLength >= 1;
-    hasSA = SAProductLength >= 1;
-    hasCASA = CAProductLength >= 1 || SAProductLength >= 1;
-    hasCCPL = CCProductLength >= 1 || PLProductLength >= 1;
-    hasOnlyCCPL =
-      (CCProductLength >= 1 || PLProductLength >= 1) &&
-      !(CAProductLength >= 1 || SAProductLength >= 1);
-    hasOnlyCASA =
-      (CAProductLength >= 1 || SAProductLength >= 1) &&
-      !(CCProductLength >= 1 || PLProductLength >= 1);
-    if (hasCASA || hasSA || hasCA || hasOnlyCASA) returnValue = true;
-    if (hasCCPL || hasOnlyCCPL || hasPL || hasCC) returnValue = false;
-  }
-  return returnValue;
-};
 
+}
 
-/**
- * The method used to check ibank encryption
- */
-export const ibankEncrypt = (userInputSelector: UserFields): any => {
-  const channelRefNo = getUrl.getChannelRefNo().channelRefNo;
-  const url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${channelRefNo}${process.env.REACT_APP_RTOB_IBANK_ENCRYPT}`;
-  const randomNumber = Math.random();
+const trackEvents = new service();
 
-  const payload = {
-    "random_number": randomNumber
-  };
-  return async (dispatch: AppDispatch) => {
-    dispatch(dispatchLoader(true));
-    return await axios
-      .post(url, payload)
-      .then(async (responses) => {
-        /**Added for local setup start */
-        const response = ibankEncryptMock
-        /**Added for local setup end */
-        const secNonce = response.data["ibank-encryptions"].securityNonce;
-        const modules = response.data["ibank-encryptions"].modules;
-        const exponent = response.data["ibank-encryptions"].exponent
-        const plain = encrypt(exponent, modules, secNonce, userInputSelector.applicants[0].password_ibk, 'Ibanking');
-        handleFieldDispatch('password_ibk', plain, dispatch)
-        handleFieldDispatch('password_ibk_confirm', '', dispatch)
-        // return Promise.resolve(response.data);
-        return await dispatch(ibankRegisterUserData(secNonce, plain))
-          .then(async (ibankresponse: any) => {
-            return Promise.resolve(ibankresponse);
-          })
-
-      })
-      .catch(async (error) => {
-        /**Added for local setup start */
-        const response = ibankEncryptMock
-        const secNonce = response.data["ibank-encryptions"].securityNonce;
-        const modules = response.data["ibank-encryptions"].modules;
-        const exponent = response.data["ibank-encryptions"].exponent
-        const plain = encrypt(exponent, modules, secNonce, userInputSelector.applicants[0].password_ibk, 'Ibanking');
-
-        handleFieldDispatch('password_ibk', plain, dispatch)
-        handleFieldDispatch('password_ibk_confirm', '', dispatch)
-        // return Promise.resolve(response.data);
-        return await dispatch(ibankRegisterUserData(secNonce, plain))
-          .then(async (ibankresponse: any) => {
-            return Promise.resolve(ibankresponse);
-          })
-        
-      });
-  };
-};
-
-export const ibankRegisterUserData = (nonce: string, pwd: String): any => {
-  const channelRefNo = getUrl.getChannelRefNo().channelRefNo;
-  const url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${channelRefNo}${process.env.REACT_APP_RTOB_IBANK_REGISTER_USER_DATA}`;
-
-  const payload = {
-    "application": {
-      "channel_reference": channelRefNo,
-      "application_reference": getUrl.getChannelRefNo().applicationRefNo
-    },
-    "applicants": [{
-      "password_ibk": pwd,
-    }]
-  }
-
-  return async (dispatch: AppDispatch) => {
-    handleFieldDispatch('securityNonce', nonce, dispatch)
-    return axios
-      .post(url, payload)
-      .then((responses) => {
-        /**Added for local setup start */
-        const response = ibankRegisterUserDataMock
-        /**Added for local setup end */
-        dispatch(dispatchLoader(false));
-        handleFieldDispatch('is_banking_registered', response.data.applicants[0]['is_banking_registered'], dispatch)
-        handleFieldDispatch('ibankingregDate', response.data.applicants[0]['ibankingregDate'], dispatch)
-        return Promise.resolve();
-      })
-      .catch((error) => {
-        /**Added for local setup start */
-        const response = ibankRegisterUserDataMock
-
-        handleFieldDispatch('is_banking_registered', response.data.applicants[0]['is_banking_registered'], dispatch)
-        handleFieldDispatch('ibankingregDate', response.data.applicants[0]['ibankingregDate'], dispatch)
-        return Promise.resolve();
-        
-      });
-  };
-};
-
-export const convertPinyin = (data: KeyWithAnyModel): any => {
-  const channelRefNo = getUrl.getChannelRefNo().channelRefNo;
-  const url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${channelRefNo}${process.env.REACT_APP_RTOB_PINYIN_TRANSLATOR}`;
-  const payload = data;
-
-  return async (dispatch: AppDispatch) => {
-    dispatch(dispatchLoader(true));
-    return axios
-      .post(url, payload)
-      .then((response) => {
-        if (response.status === 200) {
-          dispatch(dispatchLoader(false));
-          return Promise.resolve(response.data);    //After csl integration
-        } else {
-          defaultError();
-        }
-      })
-      .catch((error) => {
-        dispatch(dispatchError(error)); //Commented for local setup
-        return Promise.reject(error);  //Commented for local setup
-      });
-  };
-};
-
-export const aofDownload = (): any => {
-  const channelRefNo = getUrl && getUrl.getChannelRefNo().channelRefNo;
-  const url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${channelRefNo}${process.env.REACT_APP_RTOB_AOF_DOWNLOAD}`;
-  return async (dispatch: AppDispatch) => {
-    dispatch(dispatchLoader(true));
-    return axios
-      .get(url, {responseType: 'blob'})
-      .then((response) => {
-        if (response.status === 200) {
-          dispatch(dispatchLoader(false));
-          //After csl integration
-          const link = document.createElement('a');
-          var blob = new Blob([response.data], { type: "application/pdf" });
-          if((navigator.userAgent.indexOf("Chrome") !== -1  || navigator.userAgent.match('CriOS'))){
-            blob = new Blob([response.data], { type: "application/pdf" });
-          }else{
-             var pdfBase64Data = new Uint8Array(response.data);
-             blob = new Blob([pdfBase64Data], { type: "application/octet-stream" });
-          }
-          const dataURL = window.URL.createObjectURL(blob);
-          link.href = dataURL;
-          link.download =  getUrl.getChannelRefNo().applicationRefNo + ".pdf";
-          link.click();
-          window.URL.revokeObjectURL(dataURL);
-        } else {
-          defaultError();
-        }
-      })
-      .catch((error) => {
-        dispatch(dispatchError(error));  //After csl integration
-        return Promise.reject(error);
-      });
-  };
-};
-
-export const preserveRequest = (
-  data: any,
-  currentStageFields: any,
-  stageSelectorApplicants?: any,
-): any => {
-  const baseUrl = `${process.env.REACT_APP_RTOB_BASE_URL}`;
-  const saveEndPoint = `${process.env.REACT_APP_RTOB_SAVE_END_POINT}`;
-  const application = `${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}`;
-  const channelRefNo = getUrl.getChannelRefNo().channelRefNo;
-  const saveUrl = `${application + channelRefNo + saveEndPoint}`;
-  let url = baseUrl + saveUrl;
-
-  let payload = generatePayload.createPayload(data, currentStageFields, url, stageSelectorApplicants, 'RESUME');
-  return async (dispatch: AppDispatch) => {
-    dispatch(dispatchLoader(true));
-    return axios
-    .post(url, payload)
-    .then((response) => {
-      if (response.status === 200) {
-        dispatch(dispatchLoader(false));
-        return Promise.resolve(response);    //After csl integration
-      } else {
-        defaultError();
-      }
-    })
-    .catch((error) => {
-      dispatch(dispatchError(error)); //Commented for local setup
-      return Promise.reject(error);  //Commented for local setup
-    });
-  }
-};
-
-
-/**
- * The method used for Resume flow
- */
-
-export const resumeRequest = (appRef : string | null): any => {
-  const baseUrl = `${process.env.REACT_APP_RTOB_BASE_URL}`;
-  const endPoint = appRef + `${process.env.REACT_APP_RTOB_RESUME_END_POINT}`;
-  const url = `${
-    baseUrl +
-    process.env.REACT_APP_RTOB_APPLICATION_END_POINT +
-    endPoint
-  }`;
-
-  return async (dispatch: AppDispatch) => {
-    dispatch(dispatchLoader(true));
-    return await axios.get(url)
-      .then((response: any) => {
-        if (response.data) {
-          dispatch(dispatchLoader(false));
-          dispatch(urlParamAction.getAuthorize({ channelRefNo: response.data.application.channel_reference }));  
-          return Promise.resolve(response.data);
-        }
-      })
-      .catch((error) => {
-        dispatch(dispatchError(error)); //Commented for local setup
-        return Promise.reject(error);  //Commented for local setup
-      });
-  };
-};
-
-const handleFieldDispatch = (
-  fieldName: string,
-  childData: string | number,
-  dispatch: AppDispatch,
-) => {
-  dispatch(
-    stagesAction.modifyStage({
-      fieldData: {
-        fieldName: fieldName,
-        value: childData,
-      }
-    })
-  );
-};
+export default trackEvents;
