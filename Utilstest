@@ -1,91 +1,107 @@
-import thunk from "redux-thunk";
-import configureStore from "redux-mock-store";
-import { getFields } from "./path/to/getFields"; // Adjust the import path
-import { fieldErrorAction } from "../../../utils/store/field-error-slice";
-import { stagesAction } from "../../../utils/store/stages-slice";
-import { getLovData } from "../../../services/common-service";
-import { CONSTANTS } from "../../../utils/common/constants";
+import configureMockStore from 'redux-mock-store';
+import thunk from 'redux-thunk';
+import { exceptionCheck } from './path/to/your/exceptionCheck';
+import { errorAction } from "../utils/store/error-slice"; // Adjust the path as needed
+import { dispatchLoader } from "./common-service"; // Adjust the path as needed
 
 const middlewares = [thunk];
-const mockStore = configureStore(middlewares);
+const mockStore = configureMockStore(middlewares);
 
-describe("getFields action creator", () => {
-    let store;
+describe("exceptionCheck", () => {
+  let store: any;
 
-    beforeEach(() => {
-        store = mockStore({});
+  beforeEach(() => {
+    store = mockStore({});
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("should resolve for CONTINUE action with INFO response type", async () => {
+    const response = {
+      status: 200,
+      data: {
+        application: {
+          response_action: "CONTINUE",
+          response_type: "INFO"
+        }
+      }
+    };
+    
+    await store.dispatch(exceptionCheck(response));
+    expect(store.getActions()).toEqual([]);
+  });
+
+  it("should dispatch error for RESUBMIT action with errors", async () => {
+    const response = {
+      status: 200,
+      data: {
+        application: {
+          response_action: "RESUBMIT",
+          response_type: "HARD",
+          errors: {
+            errors: [{ detail: "Some error occurred." }]
+          }
+        }
+      }
+    };
+
+    await store.dispatch(exceptionCheck(response)).catch((err) => {
+      expect(err).toBe("Rejected");
+      const actions = store.getActions();
+      expect(actions).toContainEqual(errorAction.getRetryStatus(true));
+      expect(actions).toContainEqual(expect.objectContaining(dispatchLoader(false)));
     });
+  });
 
-    it("should dispatch actions when radioResidency changes to Exit-Entry Permit", async () => {
-        const getStages = [
-            {
-                stageId: "test",
-                stageInfo: {
-                    fieldMetaData: {
-                        data: {
-                            stages: [
-                                {
-                                    fields: [
-                                        { logical_field_name: "EEP" },
-                                        { logical_field_name: "expiry_date" },
-                                        { logical_field_name: "passport_no" }
-                                    ]
-                                }
-                            ]
-                        }
-                    },
-                    applicants: [{}]
-                }
-            }
-        ];
-        
-        const radioResidency = {
-            logical_field_name: 'id_type_cb',
-            value: 'Exit-Entry Permit'
-        };
-        
-        const expectedActions = [
-            fieldErrorAction.removeMandatoryFields(["passport_no"]),
-            stagesAction.removeAddToggleField({
-                removeFields: ["passport_no"],
-                newFields: ["EEP", "expiry_date"],
-                value: ''
-            })
-        ];
+  it("should resolve for SUCCESS action with SOFT response type", async () => {
+    const response = {
+      status: 200,
+      data: {
+        application: {
+          response_action: "SUCCESS",
+          response_type: "SOFT"
+        }
+      }
+    };
 
-        await store.dispatch(getFields(getStages, radioResidency));
-        const actions = store.getActions();
+    await store.dispatch(exceptionCheck(response));
+    expect(store.getActions()).toEqual([]);
+  });
 
-        // Verify the correct actions have been dispatched
-        expect(actions).toEqual(expect.arrayContaining(expectedActions));
+  it("should dispatch error for STOP action with HARD response type", async () => {
+    const response = {
+      status: 200,
+      data: {
+        application: {
+          response_action: "STOP",
+          response_type: "HARD",
+          errors: {
+            errors: [{ detail: "Some error occurred." }]
+          }
+        }
+      }
+    };
+
+    await store.dispatch(exceptionCheck(response)).catch((err) => {
+      expect(err).toBe("Rejected");
+      const actions = store.getActions();
+      expect(actions).toContainEqual(expect.objectContaining(errorAction.getExceptionList(expect.anything())));
+      expect(actions).toContainEqual(dispatchLoader(false));
     });
+  });
 
-    it("should dispatch actions for investment experience scenarios", async () => {
-        const getStages = [
-            // Mock your stages here
-        ];
-        
-        const radioResidency = {
-            logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE,
-            value: "some value"
-        };
+  it("should reject for non 200 or 201 status", async () => {
+    const response = {
+      status: 400,
+      data: {}
+    };
 
-        const userInputs = { applicants: [{ investment_experience: CONSTANTS.LOV_DATA.YES }] };
-        const userAge = { userAge: 30 };
-
-        const expectedActions = [
-            fieldErrorAction.getMandatoryFields(["some_field"]),
-            stagesAction.updateDynamicFields({ 'label': CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION, 'value': '' }),
-            // Add other expected actions as per your logic
-        ];
-
-        await store.dispatch(getFields(getStages, radioResidency, userInputs, userAge));
-        const actions = store.getActions();
-
-        // Verify the actions
-        expect(actions).toEqual(expect.arrayContaining(expectedActions));
+    await store.dispatch(exceptionCheck(response)).catch((err) => {
+      expect(err).toBe("Rejected");
+      const actions = store.getActions();
+      expect(actions).toContainEqual(expect.objectContaining(errorAction.getExceptionList(expect.anything())));
     });
-
-    // Add more test cases as needed for various scenarios
-
+  });
 });
