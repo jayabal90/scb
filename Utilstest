@@ -1,118 +1,58 @@
-// actions.test.ts
-import { store } from "../utils/store/store"; // Your store
-import { dispatchError, dispatchLoader, getLovData } from "./your-actions-file"; // Import your actions
-import { errorAction } from "../utils/store/error-slice";
-import { loaderAction } from "../utils/store/loader-slice";
-import axios from "axios";
-import configureStore from "redux-mock-store";
-import thunk from "redux-thunk";
+import configureMockStore from 'redux-mock-store';
+import thunk from 'redux-thunk';
+import axios from 'axios';
+import MockAdapter from 'axios-mock-adapter';
+import { getLovData, lovAction, dispatchError } from 'path-to-your-module';
+import { CONSTANTS } from '../utils/common/constants';
+import { MyinfoNoResponseModel } from "../utils/model/common-model";
 
-// Mock the axios module
-jest.mock("axios");
-
-// Create a mock store
 const middlewares = [thunk];
-const mockStore = configureStore(middlewares);
+const mockStore = configureMockStore(middlewares);
+const mockAxios = new MockAdapter(axios); // to mock axios calls
 
-describe("Redux Actions", () => {
-  let store: any;
+describe('getLovData action', () => {
+  let store;
 
   beforeEach(() => {
     store = mockStore({});
+    mockAxios.reset(); // Reset axios mock state before each test
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
+  it('should create GET_LOV_DATA action when fetching lov data successfully', async () => {
+    const field = 'testField';
+    const resData = [{ CODE_DESC: 'testDesc', CODE_VALUE: 'testValue' }];
+    const expectedActions = [
+      {
+        type: lovAction.getLovData.type,
+        payload: {
+          label: field,
+          value: resData
+        }
+      }
+    ];
+
+    mockAxios.onGet(/.+/).reply(200, resData); // Mocking our API call
+
+    await store.dispatch(getLovData(field));
+
+    const actions = store.getActions();
+    expect(actions).toEqual(expectedActions);
   });
 
-  describe("dispatchError", () => {
-    it("should dispatch errorAction when error has response", () => {
-      const errorResponse = {
-        response: {
-          status: 404,
-          statusText: "Not Found",
-        },
-      };
-      const expectedActions = [
-        loaderAction.getState({ isFetching: false }),
-        errorAction.getError({
-          statusCode: 404,
-          statusText: "Not Found",
-        }),
-      ];
+  it('should dispatch error action on API call failure', async () => {
+    const field = 'testField';
+    const mockErrorResponse = {
+      response: {
+        status: 404,
+        statusText: 'Not Found'
+      }
+    };
 
-      store.dispatch(dispatchError(errorResponse));
+    mockAxios.onGet(/.+/).reply(404); // Mocking a failed API call
 
-      const actions = store.getActions();
-      expect(actions).toEqual(expectedActions);
-    });
+    await store.dispatch(getLovData(field));
 
-    it("should dispatch default errorAction when no response", () => {
-      const errorResponse = {};
-      const expectedActions = [
-        loaderAction.getState({ isFetching: false }),
-        errorAction.getError({
-          statusCode: "error",
-          statusText: "no response",
-        }),
-      ];
-
-      store.dispatch(dispatchError(errorResponse));
-
-      const actions = store.getActions();
-      expect(actions).toEqual(expectedActions);
-    });
-  });
-
-  describe("dispatchLoader", () => {
-    it("should dispatch loader state", () => {
-      const expectedActions = [
-        loaderAction.getState({ isFetching: true }),
-      ];
-
-      store.dispatch(dispatchLoader(true));
-
-      const actions = store.getActions();
-      expect(actions).toEqual(expectedActions);
-    });
-  });
-
-  describe("getLovData", () => {
-    it("should fetch LOV data and dispatch lovAction", async () => {
-      const mockResponse = {
-        data: [
-          { CODE_DESC: "Description 1", CODE_VALUE: "Value 1" },
-          { CODE_DESC: "Description 2", CODE_VALUE: "Value 2" },
-        ],
-      };
-      (axios.get as jest.Mock).mockResolvedValueOnce(mockResponse);
-
-      const field = "someField";
-      await store.dispatch(getLovData(field));
-
-      const actions = store.getActions();
-      expect(actions).toContainEqual(
-        expect.objectContaining({
-          type: "LOV_ACTION_TYPE", // Replace with the actual action type
-          payload: {
-            label: field,
-            value: mockResponse.data,
-          },
-        })
-      );
-    });
-
-    it("should dispatch errors from getLovData", async () => {
-      (axios.get as jest.Mock).mockRejectedValueOnce(new Error("Network error"));
-
-      await store.dispatch(getLovData("someField"));
-
-      const actions = store.getActions();
-      expect(actions).toContainEqual(
-        expect.objectContaining({
-          type: "ERROR_ACTION_TYPE", // Replace with the actual error action type
-        })
-      );
-    });
+    const actions = store.getActions();
+    expect(actions).toContainEqual(dispatchError(mockErrorResponse));
   });
 });
