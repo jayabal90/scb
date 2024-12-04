@@ -1,91 +1,81 @@
 import React from 'react';
 import { shallow } from 'enzyme';
-import { Provider } from 'react-redux';
-import configureStore from 'redux-mock-store';
-import OTPModel from './OTPModel'; // Adjust the import according to your directory structure.
-// Mocking necessary functions
-import * as redux from 'react-redux';
-import { getRandomChallenge, getGenerateOtp } from '../../../modules/preApproval/services/preApprovalServices';
+import { useDispatch, useSelector } from 'react-redux';
+import OTPModel from './OTPModel'; // Adjust import path as necessary
+import { preApprovalAction } from '../../../modules/preApproval/store/preApproval-slice';
+import modelInfo from '../../../assets/_json/model.json';
 
-jest.mock('../../../modules/preApproval/services/preApprovalServices');
+jest.mock('react-redux', () => ({
+  useSelector: jest.fn(),
+  useDispatch: jest.fn(),
+}));
 
-const mockStore = configureStore();
-const store = mockStore({
-  stages: {
-    stages: [],
-    userInput: {
-      applicants: [{
-        mobile_number: '1234567890',
-      }],
-    },
-  },
-  preApproval: {
-    formConfigmetaData: {
-      application: {
-        channel_reference: 'some_reference',
-      },
-      products: [{}],
-    },
-  },
-  model: {
-    toggleModel: false,
-  },
-});
-
-describe('OTPModel', () => {
-  let useDispatchSpy;
+describe('<OTPModel />', () => {
+  let dispatch;
+  let wrapper;
 
   beforeEach(() => {
-    useDispatchSpy = jest.spyOn(redux, 'useDispatch');
-    useDispatchSpy.mockReturnValue(jest.fn());
+    // Create a mock dispatch function
+    dispatch = jest.fn();
+    useDispatch.mockReturnValue(dispatch);
+
+    // Set up the mock return values for useSelector
+    useSelector.mockImplementation((callback) => {
+      const stateMock = {
+        stages: {
+          stages: [{ /* your mock stage data here */ }],
+          userInput: {
+            applicants: [{ mobile_number: '1234567890' }],
+          },
+        },
+        model: {
+          toggleModel: false,
+        },
+        preApproval: {
+          formConfigmetaData: {
+            application: { channel_reference: 'some_reference' },
+            products: [{}],
+          },
+        },
+      };
+      return callback(stateMock);
+    });
+
+    // Use shallow rendering for component
+    wrapper = shallow(<OTPModel />);
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    jest.clearAllMocks(); // Reset mocks after each test
   });
 
-  it('should render correctly with initial state', () => {
-    const wrapper = shallow(
-      <Provider store={store}>
-        <OTPModel />
-      </Provider>
-    ).dive().dive(); // Diving twice because of the Provider
-
+  it('should render without crashing', () => {
     expect(wrapper.exists()).toBe(true);
   });
 
   it('should call generateOtp on mount', () => {
-    const generateOtpMock = jest.fn();
-    jest.spyOn(OTPModel.prototype, 'generateOtp').mockImplementation(generateOtpMock);
-
-    shallow(
-      <Provider store={store}>
-        <OTPModel />
-      </Provider>
-    ).dive().dive();
-
-    expect(generateOtpMock).toHaveBeenCalled();
+    const instance = wrapper.instance();
+    const spy = jest.spyOn(instance, 'generateOtp');
+    instance.componentDidMount();
+    expect(spy).toHaveBeenCalled();
   });
 
-  it('should display OTP expired message when timer gets to zero', () => {
-    jest.useFakeTimers();
-
-    const wrapper = shallow(
-      <Provider store={store}>
-        <OTPModel />
-      </Provider>
-    ).dive().dive();
-
-    // Simulate the timer reducing to zero
-    wrapper.setState({ seconds: 1 });
+  it('should show expired OTP message when seconds are 0', () => {
     wrapper.setState({ seconds: 0 });
-
-    wrapper.update();
-
-    expect(wrapper.find('.otp-alert-icon').exists()).toBe(true);
-    expect(wrapper.find('.Your-last-requested').exists()).toBe(true);
+    expect(wrapper.find('.expired-color').exists()).toBeTruthy();
   });
 
-  // Other tests to cover further functionality...
+  it('should call dispatch on requestNewOtp', () => {
+    wrapper.instance().didntReceiveOtp(); // Call function that dispatches new OTP
+    expect(dispatch).toHaveBeenCalled();
+  });
+
+  it('should update OTP value on input change', () => {
+    const otpInput = wrapper.find('input#otp1'); // Assuming the input has id `otp1`
+    otpInput.simulate('change', { target: { value: '1' } });
+    expect(wrapper.state('otpVal')).toContain('1');
+  });
+
+  // Add more tests for other functionalities as needed
 
 });
