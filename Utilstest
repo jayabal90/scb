@@ -1,90 +1,100 @@
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react';
-import { Button } from './Button'; // Adjust the import based on your file structure
-import { useDispatch, useSelector } from 'react-redux';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import configureStore from 'redux-mock-store';
+import AuthorizeComponent from './AuthorizeComponent'; // Adjust the import based on your file structure
+import { checkboxAction } from '../../../utils/store/checkbox-slice';
+import { ValueUpdateAction } from '../../../utils/store/value-update-slice';
 
-// Mock the useDispatch and useSelector hooks
-jest.mock('react-redux', () => ({
-  useDispatch: jest.fn(),
-  useSelector: jest.fn(),
-}));
+const mockStore = configureStore([]);
 
-describe('Button Component', () => {
-  const mockDispatch = jest.fn();
-  const mockSelector = {
-    stages: {
-      stages: [], // Add initial state as needed for your tests
-      userInput: {
-        applicants: [{
-          res_name_of_street_1: 'Street 1',
-          res_building_estate_1: 'Building 1',
-          res_room_flat_1: 'Room 1',
-        }]
+describe('AuthorizeComponent', () => {
+  let store: any;
+  const stageSelectorMock = {
+    stages: [
+      {
+        stageId: 'AD_2',
+        stageInfo: {
+          applicants: [{}]
+        }
       }
-    },
-    tax: { count: 1, maxCount: 5 },
+    ]
   };
-  
+
   beforeEach(() => {
-    // Clear mock data before each test
+    store = mockStore({
+      stages: stageSelectorMock,
+      checkboxSlice: { selectedvalue: JSON.stringify([]) },
+      fielderror: { error: null }
+    });
+
     jest.clearAllMocks();
-    useDispatch.mockReturnValue(mockDispatch);
-    useSelector.mockImplementation(callback => callback(mockSelector));
   });
 
-  test('renders button with correct props', () => {
-    const props = {
-      data: {
-        logical_field_name: 'add_tax_residence',
-        rwb_label_name: 'Add Tax Residence',
-        regex: ''
-      },
-      handleCallback: jest.fn(),
-      handleFieldDispatch: jest.fn(),
-      value: '',
-    };
+  test('renders without crashing', () => {
+    render(
+      <Provider store={store}>
+        <AuthorizeComponent data={{ logical_field_name: 'marketing_post', rwb_label_name: 'Marketing Post' }} />
+      </Provider>
+    );
 
-    const { getByTestId } = render(<Button {...props} />);
-
-    expect(getByTestId('button')).toBeInTheDocument();
-    expect(getByTestId('button')).toHaveValue('Add Tax Residence');
+    expect(screen.getByLabelText(/Marketing Post/i)).toBeInTheDocument();
   });
 
-  test('clicking the button calls userInput function', () => {
-    const props = {
-      data: {
-        logical_field_name: 'add_tax_residence',
-        rwb_label_name: 'Add Tax Residence',
-        regex: ''
-      },
-      handleCallback: jest.fn(),
-      handleFieldDispatch: jest.fn(),
-      value: '',
-    };
-
-    const { getByTestId } = render(<Button {...props} />);   
-    fireEvent.click(getByTestId('button'));
-
-    // Expect userInput to be called with correct argument
-    expect(mockDispatch).toHaveBeenCalledTimes(1); // Ensure dispatch was called
-  });
-
-  test('hides button when taxSelector count exceeds maxCount', () => {
-    mockSelector.tax.count = 6; // Set count higher than maxCount
-    const props = {
-      data: {
-        logical_field_name: 'add_tax_residence',
-        rwb_label_name: 'Add Tax Residence',
-        regex: ''
-      },
-      handleCallback: jest.fn(),
-      handleFieldDispatch: jest.fn(),
-      value: '',
-    };
-
-    const { getByTestId } = render(<Button {...props} />);
+  test('checkbox toggles correctly', () => {
+    const handleCallback = jest.fn();
+  
+    render(
+      <Provider store={store}>
+        <AuthorizeComponent data={{ logical_field_name: 'marketing_post', rwb_label_name: 'Marketing Post', handleCallback }} />
+      </Provider>
+    );
     
-    // Button should be hidden due to updated taxSelector
-    expect(getByTestId('button')).not.toBeVisible();
+    const checkbox = screen.getByLabelText(/Marketing Post/i);
+    expect(checkbox).not.toBeChecked();
+
+    fireEvent.click(checkbox);
+    
+    expect(checkbox).toBeChecked();
+    expect(handleCallback).toHaveBeenCalledWith('marketing_post', 'Y');
+    
+    fireEvent.click(checkbox);
+    
+    expect(checkbox).not.toBeChecked();
+    expect(handleCallback).toHaveBeenCalledWith('marketing_post', 'N');
+  });
+
+  test('dispatches actions correctly upon checkbox change', () => {
+    const dispatch = jest.fn();
+    
+    store.dispatch = dispatch;
+    
+    const { getByLabelText } = render(
+      <Provider store={store}>
+        <AuthorizeComponent data={{ logical_field_name: 'marketing_post', rwb_label_name: 'Marketing Post' }} />
+      </Provider>
+    );
+
+    const checkbox = getByLabelText(/Marketing Post/i);
+    
+    fireEvent.click(checkbox);
+    
+    expect(dispatch).toHaveBeenCalledWith(ValueUpdateAction.getChangeUpdate({ id: 'AD_2', changes: true }));
+    expect(dispatch).toHaveBeenCalledWith(checkboxAction.updateCheckbox([]));
+  });
+
+  test('shows popup when all marketing options are unchecked', () => {
+    const { getByLabelText } = render(
+      <Provider store={store}>
+        <AuthorizeComponent data={{ logical_field_name: 'marketing_post', rwb_label_name: 'Marketing Post' }} />
+      </Provider>
+    );
+
+    const checkbox = getByLabelText(/Marketing Post/i);
+    fireEvent.click(checkbox); // Check the box
+    fireEvent.click(checkbox); // Uncheck the box
+
+    // Assuming other relevant states and conditions are met for the popup to show
+    expect(screen.getByText(/Choose Again/i)).toBeInTheDocument();
   });
 });
