@@ -1,85 +1,67 @@
-import React from 'react';
-import { shallow } from 'enzyme';
-import { Provider } from 'react-redux';
-import configureStore from 'redux-mock-store';
-import AuthorizeComponent from './AuthorizeComponent'; // Adjust the import based on your file structure
-import * as constants from '../../../utils/common/constants';
+import rulesUtils from './path/to/rulesUtils'; // adjust the import path as necessary
+import { FieldsetModel, KeyWithAnyModel } from '../../utils/model/common-model';
 
-const mockStore = configureStore([]);
-const initialState = {
-  stages: {
-    stages: [
-      {
-        stageId: constants.STAGE_NAMES.AD_2,
-        stageInfo: {
-          applicants: [{
-            marketing_post: 'Y',
-            marketing_mobile_message: 'Y',
-            marketing_email: 'Y',
-            marketing_phone_all: 'Y',
-            marketing_phone_rm: 'N',
-          }],
-        },
-      },
-    ],
-  },
-  checkboxSlice: {
-    selectedvalue: null, // or appropriate initial value
-  },
-  fielderror: {
-    error: null, // or appropriate initial value
-  },
-};
+describe('rulesUtils function', () => {
+    it('should mark fields as editable based on nonEditable list', () => {
+        const props: Array<Array<FieldsetModel>> = [
+            [{
+                logical_field_name: 'field1',
+                fields: [{ logical_field_name: 'fieldA' }, { logical_field_name: 'fieldB' }]
+            }]
+        ];
+        const validationObj = {
+            nonEditable: [['fieldB']]
+        };
 
-describe('<AuthorizeComponent />', () => {
-  let store;
-  let wrapper;
+        const result = rulesUtils(props, validationObj);
 
-  const mockProps = {
-    data: {
-      logical_field_name: 'marketing_post',
-      rwb_label_name: 'Post Marketing',
-      info_tooltips: 'Info about Post Marketing',
-      details: 'Detailed info about Post Marketing',
-    },
-    handleCallback: jest.fn(),
-    updateCheckboxStatus: jest.fn(),
-  };
+        expect(result[0].fields[0].editable).toBe(false); // fieldA should be editable
+        expect(result[0].fields[1].editable).toBe(true);  // fieldB should not be editable
+    });
 
-  beforeEach(() => {
-    store = mockStore(initialState);
-    wrapper = shallow(
-      <Provider store={store}>
-        <AuthorizeComponent {...mockProps} />
-      </Provider>
-    ).dive().dive(); // Use .dive() to get to the component without the Provider
-  });
+    it('should set default_visibility to null for specific fields', () => {
+        const props: Array<Array<FieldsetModel>> = [
+            [{
+                logical_field_name: 'field1',
+                fields: [{ logical_field_name: 'monthly_installment_mortgage_payment' }]
+            }]
+        ];
+        const validationObj = { nonEditable: [[]] };
 
-  it('should render without crashing', () => {
-    expect(wrapper.exists()).toBe(true);
-  });
+        const result = rulesUtils(props, validationObj);
+        
+        expect(result[0].fields[0].default_visibility).toBe(null);  // should be null
+    });
 
-  it('should have the checkbox checked when marketing_post is Y', () => {
-    const checkbox = wrapper.find('input[type="checkbox"]');
-    expect(checkbox.prop('checked')).toBe(true);
-  });
+    it('should set default_visibility to "No" for hidden fields', () => {
+        const props: Array<Array<FieldsetModel>> = [
+            [{
+                logical_field_name: 'fieldset1',
+                fields: [{ logical_field_name: 'place_of_birth' }]
+            }]
+        ];
+        const validationObj = { nonEditable: [[]] };
 
-  it('should call handleCallback when checkbox is changed', () => {
-    const checkbox = wrapper.find('input[type="checkbox"]');
-    checkbox.simulate('change', { target: { checked: false, value: 'N' } });
-    
-    expect(mockProps.handleCallback).toHaveBeenCalled();
-    expect(mockProps.updateCheckboxStatus).toHaveBeenCalled();
-  });
-  
-  it('should show a popup when checkbox is unchecked and confirm_direct_marketing is true', () => {
-    // Simulate unchecking the checkbox
-    const checkbox = wrapper.find('input[type="checkbox"]');
-    checkbox.simulate('change', { target: { checked: false, value: 'N' } });
-    
-    // Assuming your logic sets showPopup to true
-    expect(wrapper.find('Model')).toHaveLength(1); // Check if the modal shows up
-  });
+        const result = rulesUtils(props, validationObj);
 
-  // Add more tests based on the application's logic and requirements
+        expect(result[0].fields[0].default_visibility).toBe('No');  // should be "No"
+    });
+
+    it('should filter out fields with default_visibility as "No"', () => {
+        const props: Array<Array<FieldsetModel>> = [
+            [{
+                logical_field_name: 'fieldset1',
+                fields: [
+                    { logical_field_name: 'fieldA', default_visibility: 'Yes' },
+                    { logical_field_name: 'place_of_birth', default_visibility: 'No' }
+                ]
+            }]
+        ];
+        const validationObj = { nonEditable: [[]] };
+
+        const result = rulesUtils(props, validationObj);
+
+        expect(result[0].fields.length).toBe(1); // only fieldA should be present
+        expect(result[0].fields[0].logical_field_name).toBe('fieldA');
+    });
 });
