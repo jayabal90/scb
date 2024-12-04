@@ -1,44 +1,118 @@
-// encrypt.test.js
-import encrypt from './path_to_your_encrypt_function'; // Update this path accordingly
+// actions.test.ts
+import { store } from "../utils/store/store"; // Your store
+import { dispatchError, dispatchLoader, getLovData } from "./your-actions-file"; // Import your actions
+import { errorAction } from "../utils/store/error-slice";
+import { loaderAction } from "../utils/store/loader-slice";
+import axios from "axios";
+import configureStore from "redux-mock-store";
+import thunk from "redux-thunk";
 
-describe('RSA Encryption Tests', () => {
-    const exp = '010001'; // Example public exponent (should be in hex format)
-    const mod = 'AC3138F108C4048F4BB600E419B9E3693E661F0DD76EA165D62D5CFA1BECF9A8'; // Example modulus (hex format)
-    const nonce = '0123456789ABCDEF'; // Example nonce (or padding)
-    const plain = 'Hello, World!'; // The plaintext to be encrypted
+// Mock the axios module
+jest.mock("axios");
 
-    test('should encrypt plaintext with the given public key', () => {
-        const result = encrypt(exp, mod, nonce, plain, 'OTP');
-        expect(result).toBeDefined(); // Ensure something is returned
-        expect(typeof result).toBe('string'); // The result should be a string
-        
-        // Additional checks can be performed on the output format
-        // This will depend on what your encryption function outputs
-        expect(result).not.toBe(plain); // Ensure the encrypted text is not equal to plaintext
+// Create a mock store
+const middlewares = [thunk];
+const mockStore = configureStore(middlewares);
+
+describe("Redux Actions", () => {
+  let store: any;
+
+  beforeEach(() => {
+    store = mockStore({});
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe("dispatchError", () => {
+    it("should dispatch errorAction when error has response", () => {
+      const errorResponse = {
+        response: {
+          status: 404,
+          statusText: "Not Found",
+        },
+      };
+      const expectedActions = [
+        loaderAction.getState({ isFetching: false }),
+        errorAction.getError({
+          statusCode: 404,
+          statusText: "Not Found",
+        }),
+      ];
+
+      store.dispatch(dispatchError(errorResponse));
+
+      const actions = store.getActions();
+      expect(actions).toEqual(expectedActions);
     });
 
-    test('should change result when input plaintext changes', () => {
-        const newPlain = 'Goodbye, World!';
-        const result1 = encrypt(exp, mod, nonce, plain, 'OTP');
-        const result2 = encrypt(exp, mod, nonce, newPlain, 'OTP');
-        
-        expect(result1).not.toEqual(result2); // The encrypted results should not be equal
+    it("should dispatch default errorAction when no response", () => {
+      const errorResponse = {};
+      const expectedActions = [
+        loaderAction.getState({ isFetching: false }),
+        errorAction.getError({
+          statusCode: "error",
+          statusText: "no response",
+        }),
+      ];
+
+      store.dispatch(dispatchError(errorResponse));
+
+      const actions = store.getActions();
+      expect(actions).toEqual(expectedActions);
+    });
+  });
+
+  describe("dispatchLoader", () => {
+    it("should dispatch loader state", () => {
+      const expectedActions = [
+        loaderAction.getState({ isFetching: true }),
+      ];
+
+      store.dispatch(dispatchLoader(true));
+
+      const actions = store.getActions();
+      expect(actions).toEqual(expectedActions);
+    });
+  });
+
+  describe("getLovData", () => {
+    it("should fetch LOV data and dispatch lovAction", async () => {
+      const mockResponse = {
+        data: [
+          { CODE_DESC: "Description 1", CODE_VALUE: "Value 1" },
+          { CODE_DESC: "Description 2", CODE_VALUE: "Value 2" },
+        ],
+      };
+      (axios.get as jest.Mock).mockResolvedValueOnce(mockResponse);
+
+      const field = "someField";
+      await store.dispatch(getLovData(field));
+
+      const actions = store.getActions();
+      expect(actions).toContainEqual(
+        expect.objectContaining({
+          type: "LOV_ACTION_TYPE", // Replace with the actual action type
+          payload: {
+            label: field,
+            value: mockResponse.data,
+          },
+        })
+      );
     });
 
-    test('should handle empty plaintext', () => {
-        const emptyPlain = '';
-        const result = encrypt(exp, mod, nonce, emptyPlain, 'OTP');
-        
-        expect(result).toBeDefined();
-        expect(typeof result).toBe('string');
-        expect(result).not.toBe(emptyPlain); // Ensure the encrypted result isn't the same as empty plaintext
-    });
+    it("should dispatch errors from getLovData", async () => {
+      (axios.get as jest.Mock).mockRejectedValueOnce(new Error("Network error"));
 
-    test('should return a valid base64 encoded string if stage is OTP', () => {
-        const result = encrypt(exp, mod, nonce, plain, 'OTP');
-        
-        // For proper validation, check if the result is a valid base64 string
-        const base64Regex = /^[A-Za-z0-9+/]+={0,2}$/;
-        expect(base64Regex.test(result)).toBe(true); // Validate if the result is a Base64 encoded string
+      await store.dispatch(getLovData("someField"));
+
+      const actions = store.getActions();
+      expect(actions).toContainEqual(
+        expect.objectContaining({
+          type: "ERROR_ACTION_TYPE", // Replace with the actual error action type
+        })
+      );
     });
+  });
 });
