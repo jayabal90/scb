@@ -1,155 +1,91 @@
-import { render } from '@testing-library/react';
-import service from './path/to/your/service'; // Update the import to the actual path
-import { store } from "../utils/store/store"; // ensure store is accessible for tests
-import { getUrl } from "../utils/common/change.utils"; // ensure getUrl is accessible for tests
+import thunk from "redux-thunk";
+import configureStore from "redux-mock-store";
+import { getFields } from "./path/to/getFields"; // Adjust the import path
+import { fieldErrorAction } from "../../../utils/store/field-error-slice";
+import { stagesAction } from "../../../utils/store/stages-slice";
+import { getLovData } from "../../../services/common-service";
+import { CONSTANTS } from "../../../utils/common/constants";
 
-jest.mock("../utils/store/store", () => ({
-  store: {
-    getState: jest.fn(),
-  },
-}));
+const middlewares = [thunk];
+const mockStore = configureStore(middlewares);
 
-jest.mock("../utils/common/change.utils", () => ({
-  getUrl: {
-    getChannelRefNo: jest.fn().mockReturnValue({
-      channelRefNo: '12345',
-      applicationRefNo: 'app_001'
-    }),
-    getParameterByName: jest.fn().mockReturnValue('en'),
-  }
-}));
+describe("getFields action creator", () => {
+    let store;
 
-describe("Service Class", () => {
-  let trackEvents;
-  beforeEach(() => {
-    trackEvents = new service();
-    // Reset the store state before each test
-    store.getState.mockClear();
-  });
+    beforeEach(() => {
+        store = mockStore({});
+    });
 
-  test("getFormFieldValue returns correct value from LOv", () => {
-    const stageMock = {
-      stages: {
-        userInput: {
-          applicants: {
-            'FieldName_a_1': 'code1',
-          },
-        },
-        stages: [{
-          stageInfo: {
-            applicants: {
-              'FieldName_a_1': null,
-            },
-          },
-        }],
-      },
-      lov: { 
-        lov: [
-          {
-            label: 'FieldName',
-            value: [{ CODE_VALUE: 'code1', CODE_DESC: 'Value Desc' }]
-          },
-        ],
-      },
-    };
+    it("should dispatch actions when radioResidency changes to Exit-Entry Permit", async () => {
+        const getStages = [
+            {
+                stageId: "test",
+                stageInfo: {
+                    fieldMetaData: {
+                        data: {
+                            stages: [
+                                {
+                                    fields: [
+                                        { logical_field_name: "EEP" },
+                                        { logical_field_name: "expiry_date" },
+                                        { logical_field_name: "passport_no" }
+                                    ]
+                                }
+                            ]
+                        }
+                    },
+                    applicants: [{}]
+                }
+            }
+        ];
+        
+        const radioResidency = {
+            logical_field_name: 'id_type_cb',
+            value: 'Exit-Entry Permit'
+        };
+        
+        const expectedActions = [
+            fieldErrorAction.removeMandatoryFields(["passport_no"]),
+            stagesAction.removeAddToggleField({
+                removeFields: ["passport_no"],
+                newFields: ["EEP", "expiry_date"],
+                value: ''
+            })
+        ];
 
-    const result = trackEvents.getFormFieldValue('FieldName', stageMock, 'Yes');
-    expect(result).toBe('Value Desc');
-  });
+        await store.dispatch(getFields(getStages, radioResidency));
+        const actions = store.getActions();
 
-  test("getFormFieldValue returns 'na' for non-existent field", () => {
-    const stageMock = {
-      stages: {
-        userInput: {
-          applicants: {},
-        },
-        stages: [{
-          stageInfo: {
-            applicants: {},
-          }
-        }],
-      },
-      lov: {},
-    };
+        // Verify the correct actions have been dispatched
+        expect(actions).toEqual(expect.arrayContaining(expectedActions));
+    });
 
-    const result = trackEvents.getFormFieldValue('NonExistentField', stageMock, 'Yes');
-    expect(result).toBe('na');
-  });
+    it("should dispatch actions for investment experience scenarios", async () => {
+        const getStages = [
+            // Mock your stages here
+        ];
+        
+        const radioResidency = {
+            logical_field_name: CONSTANTS.LOGICAL_FIELD_NAMES.INVESTMENT_EXPERIENCE,
+            value: "some value"
+        };
 
-  test("getFormFields returns fields", () => {
-    const stageMock = {
-      stages: {
-        stages: [{
-          stageInfo: {
-            fieldMetaData: {
-              data: {
-                stages: [{
-                  stageId: 'someStageId',
-                  fields: [{ 
-                    logical_field_name: 'FieldName', 
-                    rwb_label_name: 'Tenor & monthly repayment', 
-                    lov: 'Yes' 
-                  }],
-                }],
-              },
-            },
-          },
-        }],
-      },
-    };
+        const userInputs = { applicants: [{ investment_experience: CONSTANTS.LOV_DATA.YES }] };
+        const userAge = { userAge: 30 };
 
-    const result = trackEvents.getFormFields('someStageId', stageMock, ['FieldName']);
-    expect(result).toEqual(expect.arrayContaining([expect.objectContaining({
-      formFieldValue: 'na',
-      formFieldName: 'Tenor'
-    })]));
-  });
-  
-  test("triggerAdobeEvent pushes correct data to adobeDataLayer", () => {
-    window.adobeDataLayer = []; // Reset adobeDataLayer
-    const stageMock = {
-      stages: {
-        stages: [{
-          stageInfo: {
-            applicants: {
-              profile_id: 'P123',
-            },
-          },
-        }],
-      },
-      auth: {
-        SSCode: true
-      },
-    };
+        const expectedActions = [
+            fieldErrorAction.getMandatoryFields(["some_field"]),
+            stagesAction.updateDynamicFields({ 'label': CONSTANTS.LOGICAL_FIELD_NAMES.FINANCIAL_INSTITUTION, 'value': '' }),
+            // Add other expected actions as per your logic
+        ];
 
-    store.getState.mockReturnValue(stageMock);
-    trackEvents.triggerAdobeEvent('formSubmit', 'Submit');
+        await store.dispatch(getFields(getStages, radioResidency, userInputs, userAge));
+        const actions = store.getActions();
 
-    expect(window.adobeDataLayer.length).toBe(1);
-    expect(window.adobeDataLayer[0].event).toBe('formSubmit');
-    expect(window.adobeDataLayer[0].form.refNum).toBe('app_001'); // Check against your dynamic application reference number
-  });
+        // Verify the actions
+        expect(actions).toEqual(expect.arrayContaining(expectedActions));
+    });
 
-  test("atViewStart function pushes correct view event to adobeDataLayer", () => {
-    window.adobeDataLayer = []; // Reset adobeDataLayer
-    const stageMock = {
-      stages: {
-        stages: [{
-          stageInfo: {
-            products: [
-              { product_category: 'SA', name: 'Product 1', product_type: 'Type 1' }
-            ]
-          },
-        }],
-      },
-    };
+    // Add more test cases as needed for various scenarios
 
-    store.getState.mockReturnValue(stageMock);
-    trackEvents.atViewStart();
-
-    expect(window.adobeDataLayer.length).toBe(1);
-    expect(window.adobeDataLayer[0].event).toBe('at-view-start');
-  });
-
-  // Add more tests as needed...
 });
