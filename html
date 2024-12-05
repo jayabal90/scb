@@ -1,73 +1,90 @@
-<body>
-      <div>
-        <div
-          class="hkid"
-        >
-          <label
-            for="hkidField"
-          >
-            <span
-              style="margin-left: 0px;"
-            >
+import { getUrl } from "../utils/common/change.utils";
+import { CONSTANTS } from "../utils/common/constants";
+import { KeyWithAnyModel } from "../utils/model/common-model";
+import { sortByAscendingOrder } from "./common-service";
 
-              Enter HKID
-            </span>
-          </label>
-          <div>
-            <input
-              autocomplete="off"
-              class="input-error1"
-              disabled=""
-              id="hkidField_1"
-              maxlength="2"
-              minlength="1"
-              name="hkidField_1"
-              type="text"
-              value=""
-            />
-            <span
-              class="hkid-separators-m"
-            >
-              -
-            </span>
-            <input
-              autocomplete="off"
-              class="input-error1"
-              disabled=""
-              id="hkidField_2"
-              maxlength="6"
-              minlength="6"
-              name="hkidField_2"
-              type="text"
-              value=""
-            />
-            <span
-              class="hkid-separators-m"
-            >
-              -
-            </span>
-            <span
-              class="hkid-separators-m"
-            >
-              (
-            </span>
-            <input
-              autocomplete="off"
-              class="input-error1"
-              disabled=""
-              id="hkidField_3"
-              maxlength="1"
-              minlength="1"
-              name="hkidField_3"
-              type="text"
-              value=""
-            />
-            <span
-              class="hkid-separators-m"
-            >
-              )
-            </span>
-          </div>
-        </div>
-      </div>
-    </body>
+class service {
+
+  createPayload = (data: any, currentStageFields: any, url: string, stageSelectorApplicants?: any, resume?: string) => {
+    let applicantFields = { ...currentStageFields }
+    let payload: KeyWithAnyModel = {};
+    let stageCode: string | null = null;
+    payload = {
+      application: {
+        channel_reference: getUrl.getChannelRefNo().channelRefNo,
+      },
+      applicants: [{}]
+    };
+
+    // if (data.stageId === CONSTANTS.STAGE_NAMES.RP)
+    //   delete payload.applicants
+
+    if (getUrl.getChannelRefNo().applicationRefNo !== null) {
+      payload.application['application_reference'] = getUrl.getChannelRefNo().applicationRefNo;
+    }
+
+    if(resume === 'RESUME') {
+      payload.application['is_save_to_pega'] = 'YES'
+    }
+
+    if (data.stageId === "ad-1" || data.stageId === "ad-2") {
+      stageCode = "AD";
+    } else if (data.stageId === "rp") {
+      stageCode = "FFD";
+    } else {
+      stageCode = "BD";
+    }
+
+    // After resume ssf-3 mobile number payload removes
+    if(data.stageId === CONSTANTS.STAGE_NAMES.BD_3) {
+      if(applicantFields['mobile_number_rwb']) {
+        delete applicantFields['mobile_number_rwb'];
+      }
+    }
+
+    // Temporary fix for removing the payload data based on 
+    if(data.stageId === CONSTANTS.STAGE_NAMES.BD_5) {
+      if(applicantFields["res_country_1"] !== CONSTANTS.LOV_DATA.CHINESE_MAINLAND) {
+        delete applicantFields['alt_address_same_as_res_address_2']
+      }
+      if(applicantFields["res_country_1"] === CONSTANTS.LOV_DATA.CHINESE_MAINLAND) {
+        delete applicantFields['alt_address_same_as_res_address_3']
+
+      }
+    }
+
+    if (url.split("/").indexOf("preserve") !== -1) {
+      payload.application.stage = {
+        stage_id: stageCode,
+        page_id: data.stageId,
+      };
+    }
+    if (applicantFields) {
+      const isApplicant = Object.keys(applicantFields).length > 0;
+      if (isApplicant) {
+        for (let field in applicantFields) {
+          if (applicantFields[field] === '' || applicantFields[field] === null) {
+            delete applicantFields[field];
+          }
+        }
+      }
+
+      //Add only modified input into payload
+      let filteredApplicants: KeyWithAnyModel = {};
+      Object.keys(applicantFields).forEach((key) => {
+        if (applicantFields[key] !== stageSelectorApplicants[key]) {
+          filteredApplicants[key] = applicantFields[key];
+        }
+      });
+
+      if (Object.keys(applicantFields).length > 0) {
+        payload["applicants"][0] = Object.keys(filteredApplicants).length > 0 ? filteredApplicants : applicantFields;
+      }
+      return sortByAscendingOrder(payload);
+    }
+  };
+}
+
+const generatePayload = new service();
+
+export default generatePayload;
