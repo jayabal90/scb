@@ -1,111 +1,114 @@
-import generatePayload from './path-to-your-service-file'; // Update with the actual path
-import { CONSTANTS } from "../utils/common/constants";
-import * as changeUtils from "../utils/common/change.utils"; // Import the utility to mock
-import { sortByAscendingOrder } from "./common-service";
+// service.test.ts
+import trackEvents from '../path/to/service';
+import { store } from "../utils/store/store";
+import { getUrl } from "../utils/common/change.utils";
 
-// Mocking functions
-jest.mock("../utils/common/change.utils", () => ({
-  getUrl: {
-    getChannelRefNo: jest.fn(),
-  }
-}));
+jest.mock("../utils/store/store"); // Mock store to control its behavior
+jest.mock("../utils/common/change.utils"); // Mock getUrl
 
-jest.mock("./common-service", () => ({
-  sortByAscendingOrder: jest.fn((payload) => payload) // Just return the payload for simplicity
-}));
-
-describe('service createPayload', () => {
-  beforeEach(() => {
-    jest.clearAllMocks(); // Clear mocks before each test
-  });
-
-  it('should create payload correctly for stageId "ad-1"', () => {
-    changeUtils.getUrl.getChannelRefNo.mockReturnValue({
-      channelRefNo: 'testChannelRef',
-      applicationRefNo: 'testAppRef'
-    });
-
-    const data = { stageId: "ad-1" };
-    const currentStageFields = { name: 'John Doe', mobile_number_rwb: '123456789' };
-    const url = "http://test.com/preserve";
-    const stageSelectorApplicants = { name: '', mobile_number_rwb: '987654321' };
-    const resume = undefined;
-
-    const expectedPayload = {
-      application: {
-        channel_reference: 'testChannelRef',
-        application_reference: 'testAppRef',
-        stage: { stage_id: "AD", page_id: "ad-1" }
-      },
-      applicants: [{
-        name: 'John Doe',
-        mobile_number_rwb: '123456789'
-      }]
+describe('Service Class Tests', () => {
+    const mockStage = {
+        stages: {
+            stages: [
+                {
+                    stageId: 'someStageId',
+                    stageInfo: {
+                        applicants: {
+                            profile_id: '1234',
+                            userInput: {
+                                applicants: {},
+                            },
+                        },
+                        fieldMetaData: {
+                            country: 'CA',
+                        },
+                        products: [
+                            {
+                                name: 'Product A',
+                                product_type: 'typeA',
+                                product_category: 'SA',
+                            },
+                        ],
+                    },
+                },
+            ]
+        },
     };
 
-    const result = generatePayload.createPayload(data, currentStageFields, url, stageSelectorApplicants, resume);
-
-    expect(result).toEqual(expectedPayload);
-  });
-
-  it('should delete mobile_number_rwb for stageId "bd_3"', () => {
-    changeUtils.getUrl.getChannelRefNo.mockReturnValue({
-      channelRefNo: 'testChannelRef',
-      applicationRefNo: 'testAppRef'
+    beforeEach(() => {
+        // Reset the store's state or any other mocks before each test
+        jest.clearAllMocks();
+        store.getState.mockReturnValue(mockStage);
+        getUrl.getChannelRefNo.mockReturnValue({
+            channelRefNo: 'channel123',
+            applicationRefNo: 'app123',
+        });
     });
 
-    const data = { stageId: CONSTANTS.STAGE_NAMES.BD_3 };
-    const currentStageFields = { name: 'Jane Doe', mobile_number_rwb: '123456789' };
-    const url = "http://test.com/preserve";
-    const stageSelectorApplicants = {};
-    const resume = undefined;
+    test('getFormFieldValue returns correct value for Yes LOV', () => {
+        const labelName = 'Some Label';
+        const stage = { ...mockStage }; // Adjust as necessary
+        const lov = 'Yes';
+        
+        const mockValue = 'someValue';
+        stage.stages.stages[0].stageInfo.userInput = {
+            applicants: {
+                [labelName + '_a_1']: mockValue,
+            },
+        };
+        const result = trackEvents.getFormFieldValue(labelName, stage, lov);
 
-    const expectedPayload = {
-      application: {
-        channel_reference: 'testChannelRef',
-        application_reference: 'testAppRef',
-      },
-      applicants: [{
-        name: 'Jane Doe'
-      }]
-    };
-
-    const result = generatePayload.createPayload(data, currentStageFields, url, stageSelectorApplicants, resume);
-
-    expect(result).toEqual(expectedPayload);
-  });
-
-  it('should add is_save_to_pega when resume is "RESUME"', () => {
-    changeUtils.getUrl.getChannelRefNo.mockReturnValue({
-      channelRefNo: 'testChannelRef',
-      applicationRefNo: 'testAppRef'
+        expect(result).toBe('expected LOV description'); // Adjust expected value as necessary
     });
 
-    const data = { stageId: "rp" };
-    const currentStageFields = { name: 'John Smith' };
-    const url = "http://test.com/preserve";
-    const stageSelectorApplicants = {};
-    const resume = 'RESUME';
+    test('getFormFields returns the correct form field objects', () => {
+        const stageId = 'someStageId';
+        const logicalNames = ['Some Label'];
+        
+        const result = trackEvents.getFormFields(stageId, mockStage, logicalNames);
+        
+        expect(result).toHaveLength(1); // Should return at least one field
+        expect(result[0]).toHaveProperty('formFieldName');
+        expect(result[0]).toHaveProperty('formFieldValue');
+    });
 
-    const expectedPayload = {
-      application: {
-        channel_reference: 'testChannelRef',
-        application_reference: 'testAppRef',
-        is_save_to_pega: 'YES',
-        stage: {
-          stage_id: "FFD", 
-          page_id: "rp"
-        }
-      },
-      applicants: [{
-        name: 'John Smith'
-      }]
-    };
+    test('triggerAdobeEvent pushes the right data to window.adobeDataLayer', () => {
+        window.adobeDataLayer = [];
 
-    const result = generatePayload.createPayload(data, currentStageFields, url, stageSelectorApplicants, resume);
+        const stageId = 'someStageId';
+        const eventName = 'formStart';
+        const stepName = 'formStep1';
 
-    expect(result).toEqual(expectedPayload);
-  });
+        trackEvents.triggerAdobeEvent(eventName, 'Continue', null, null);
 
-  // Add more test cases as needed
+        expect(window.adobeDataLayer).toHaveLength(1);
+        expect(window.adobeDataLayer[0]).toHaveProperty('event', eventName);
+        expect(window.adobeDataLayer[0].form).toHaveProperty('refNum', 'app123');
+    });
+
+    test('getProductInfo returns correct product info', () => {
+        const result = trackEvents.getProductInfo(mockStage);
+        
+        expect(result).toHaveLength(2); // Should return info and form info
+        expect(result[0].productInfo).toEqual({
+            productName: 'Product A',
+            productID: 'typeA',
+            productCategory: 'SA',
+            productSubCategory: 'na',
+        });
+        expect(result[1].formInfo).toHaveProperty('formName');
+    });
+
+    test('getAdobeDataLayer returns structured data object', () => {
+        const eventName = 'pageView';
+        const stepName = 'step1';
+
+        const result = trackEvents.getAdobeDataLayer(eventName, mockStage, stepName);
+
+        expect(result).toHaveProperty('event', eventName);
+        expect(result.page.pageInfo).toHaveProperty('pageType', 'form');
+        expect(result.user.userInfo).toHaveProperty('userID', 'na');
+    });
+
+    // More tests to be added as needed...
 });
