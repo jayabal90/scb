@@ -1,114 +1,56 @@
-// service.test.ts
-import trackEvents from '../path/to/service';
-import { store } from "../utils/store/store";
-import { getUrl } from "../utils/common/change.utils";
+// actions.test.ts
+import configureMockStore from 'redux-mock-store';
+import thunk from 'redux-thunk';
+import axios from 'axios';
+import { getLovData } from './path-to-your-actions'; // Adjust import based on your file structure
+import { lovAction } from '../utils/store/lov-slice';
+import { dispatchError } from '../your-error-dispatch-function'; // Adjust based on your file structure
 
-jest.mock("../utils/store/store"); // Mock store to control its behavior
-jest.mock("../utils/common/change.utils"); // Mock getUrl
+jest.mock('axios');
+const middlewares = [thunk];
+const mockStore = configureMockStore(middlewares);
 
-describe('Service Class Tests', () => {
-    const mockStage = {
-        stages: {
-            stages: [
-                {
-                    stageId: 'someStageId',
-                    stageInfo: {
-                        applicants: {
-                            profile_id: '1234',
-                            userInput: {
-                                applicants: {},
-                            },
-                        },
-                        fieldMetaData: {
-                            country: 'CA',
-                        },
-                        products: [
-                            {
-                                name: 'Product A',
-                                product_type: 'typeA',
-                                product_category: 'SA',
-                            },
-                        ],
-                    },
-                },
-            ]
-        },
+describe('getLovData action', () => {
+  let store: any;
+
+  beforeEach(() => {
+    store = mockStore({});
+    jest.clearAllMocks();
+  });
+
+  it('dispatches LOV data on successful fetch', async () => {
+    const mockResponse = {
+      data: [
+        { CODE_DESC: "Option 1", CODE_VALUE: "1" },
+        { CODE_DESC: "Option 2", CODE_VALUE: "2" },
+      ],
     };
 
-    beforeEach(() => {
-        // Reset the store's state or any other mocks before each test
-        jest.clearAllMocks();
-        store.getState.mockReturnValue(mockStage);
-        getUrl.getChannelRefNo.mockReturnValue({
-            channelRefNo: 'channel123',
-            applicationRefNo: 'app123',
-        });
-    });
+    (axios.get as jest.Mock).mockResolvedValueOnce(mockResponse);
 
-    test('getFormFieldValue returns correct value for Yes LOV', () => {
-        const labelName = 'Some Label';
-        const stage = { ...mockStage }; // Adjust as necessary
-        const lov = 'Yes';
-        
-        const mockValue = 'someValue';
-        stage.stages.stages[0].stageInfo.userInput = {
-            applicants: {
-                [labelName + '_a_1']: mockValue,
-            },
-        };
-        const result = trackEvents.getFormFieldValue(labelName, stage, lov);
+    await store.dispatch(getLovData('testField'));
 
-        expect(result).toBe('expected LOV description'); // Adjust expected value as necessary
-    });
+    const actions = store.getActions();
 
-    test('getFormFields returns the correct form field objects', () => {
-        const stageId = 'someStageId';
-        const logicalNames = ['Some Label'];
-        
-        const result = trackEvents.getFormFields(stageId, mockStage, logicalNames);
-        
-        expect(result).toHaveLength(1); // Should return at least one field
-        expect(result[0]).toHaveProperty('formFieldName');
-        expect(result[0]).toHaveProperty('formFieldValue');
-    });
+    expect(actions[0]).toEqual(lovAction.getLovData({
+      label: 'testField',
+      value: mockResponse.data,
+    }));
+  });
 
-    test('triggerAdobeEvent pushes the right data to window.adobeDataLayer', () => {
-        window.adobeDataLayer = [];
+  it('dispatches error action on network failure', async () => {
+    const mockError = {
+      response: {
+        status: 404,
+        statusText: 'Not Found',
+      },
+    };
 
-        const stageId = 'someStageId';
-        const eventName = 'formStart';
-        const stepName = 'formStep1';
+    (axios.get as jest.Mock).mockRejectedValueOnce(mockError);
 
-        trackEvents.triggerAdobeEvent(eventName, 'Continue', null, null);
+    await store.dispatch(getLovData('testField'));
 
-        expect(window.adobeDataLayer).toHaveLength(1);
-        expect(window.adobeDataLayer[0]).toHaveProperty('event', eventName);
-        expect(window.adobeDataLayer[0].form).toHaveProperty('refNum', 'app123');
-    });
-
-    test('getProductInfo returns correct product info', () => {
-        const result = trackEvents.getProductInfo(mockStage);
-        
-        expect(result).toHaveLength(2); // Should return info and form info
-        expect(result[0].productInfo).toEqual({
-            productName: 'Product A',
-            productID: 'typeA',
-            productCategory: 'SA',
-            productSubCategory: 'na',
-        });
-        expect(result[1].formInfo).toHaveProperty('formName');
-    });
-
-    test('getAdobeDataLayer returns structured data object', () => {
-        const eventName = 'pageView';
-        const stepName = 'step1';
-
-        const result = trackEvents.getAdobeDataLayer(eventName, mockStage, stepName);
-
-        expect(result).toHaveProperty('event', eventName);
-        expect(result.page.pageInfo).toHaveProperty('pageType', 'form');
-        expect(result.user.userInfo).toHaveProperty('userID', 'na');
-    });
-
-    // More tests to be added as needed...
+    const actions = store.getActions();
+    expect(actions).toContainEqual(dispatchError(mockError));
+  });
 });
