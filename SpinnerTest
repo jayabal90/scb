@@ -1,85 +1,78 @@
-import React from 'react';
-import { render } from '@testing-library/react';
-import { Provider } from 'react-redux';
-import configureStore from 'redux-mock-store';
-import thunk from 'redux-thunk'; // Assume we're using redux-thunk for async actions
-import { dispatchLoader, dispatchError, getLovData } from './yourActionFile'; // Adjust path accordingly
-import axios from 'axios';
-import moxios from 'moxios'; // For mocking axios requests
+import PreApprovalUtil from './PreApprovalUtil'; // Adjust the import according to your directory structure
+import { store } from '../../../utils/store/store'; // Adjust if necessary
+import { v4 as uuid } from 'uuid';
 
-const middlewares = [thunk];
-const mockStore = configureStore(middlewares);
+jest.mock('uuid', () => ({
+  v4: jest.fn(() => '123-456'), // Mocked UUID
+}));
 
-describe('Redux Actions', () => {
-  let store;
-
+describe('PreApprovalUtil', () => {
   beforeEach(() => {
-    store = mockStore({});
-    moxios.install(); // Install moxios for each test
-  });
-
-  afterEach(() => {
-    moxios.uninstall(); // Uninstall moxios after each test
-    jest.clearAllMocks(); // Clear all mocks
-  });
-
-  it('dispatches dispatchLoader action', () => {
-    const expectedActions = [
-      { type: 'loader/getState', payload: { isFetching: true } }
-    ];
-    store.dispatch(dispatchLoader(true));
-    expect(store.getActions()).toEqual(expectedActions);
-  });
-
-  it('dispatches dispatchError action with response error', async () => {
-    const mockError = {
-      response: {
-        status: 404,
-        statusText: 'Not Found',
-      },
-    };
-
-    store.dispatch(dispatchError(mockError));
+    // Reset mocks before each test
+    jest.clearAllMocks();
     
-    const expectedActions = [
-      { type: 'loader/getState', payload: { isFetching: false } },
-      {
-        type: 'error/getError',
-        payload: {
-          statusCode: 404,
-          statusText: 'Not Found',
-        },
+    // Mocking the store state
+    store.getState = jest.fn(() => ({
+      stages: {
+        stages: [{
+          stageInfo: {
+            applicants: [{ /* Mock applicant data */ }],
+            application: {},
+            lov_desc: {},
+          },
+          stageId: 'AD_1',
+        }]
       },
-    ];
-
-    expect(store.getActions()).toEqual(expectedActions);
-  });
-
-  it('successfully fetches lov data', async () => {
-    const testField = 'testField';
-    const url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_LOVREF}${testField}`;
-    moxios.stubRequest(url, {
-      status: 200,
-      response: [{ CODE_DESC: 'Test Desc', CODE_VALUE: 'Test Value' }]
-    });
-
-    await store.dispatch(getLovData(testField));
-
-    const expectedActions = [
-      { 
-        type: 'loader/getState', 
-        payload: { isFetching: true } 
+      lovDesc: {
+        lovDesc: [
+          { label: 'res_city', code_desc: 'Hong Kong' },
+          { label: 'off_city', code_desc: 'Kowloon' },
+        ],
       },
-      { 
-        type: 'lov/getLovData', 
-        payload: { label: testField, value: [{ CODE_DESC: 'Test Desc', CODE_VALUE: 'Test Value' }] } 
-      },
-      { 
-        type: 'loader/getState', 
-        payload: { isFetching: false } 
+      auth: {
+        sessionUid: 'session-id',
       }
-    ];
-
-    expect(store.getActions()).toEqual(expectedActions);
+    }));
   });
+
+  test('generateUUID should return a unique identifier', () => {
+    const uuid = PreApprovalUtil.generateUUID();
+    expect(uuid).toBe('123-456');
+  });
+
+  test('getApplicantFields should return correct fields', () => {
+    const fields = PreApprovalUtil.getApplicantFields();
+    expect(fields.length).toBeGreaterThan(0); // Adjust based on what you expect
+  });
+
+  test('getSHA256Hash should return a SHA256 hash', async () => {
+    const input = 'test-input';
+    const hash = await PreApprovalUtil.getSHA256Hash(input);
+    expect(hash).toBeDefined(); // Replace with expected hash if known
+  });
+
+  test('getAckMetaData should return metadata object', () => {
+    const channelReference = 'channel-123';
+    const result = JSON.parse(PreApprovalUtil.getAckMetaData(channelReference));
+    
+    expect(result).toHaveProperty('reqId', '123-456'); // Mocked UUID
+    expect(result).toHaveProperty('Channel', 'MOBILE');
+    // Add more assertions based on expected structure
+  });
+
+  test('getFormConfigPayload should return a correctly structured payload', () => {
+    const payload = PreApprovalUtil.getFormConfigPayload();
+
+    expect(payload).toHaveProperty('applicants');
+    expect(payload.applicants).toHaveProperty('bauth_key');
+    // Add assertions for each expected property and structure
+    expect(payload.stage).toHaveProperty('stage_status', 'incomplete');
+  });
+
+  test('getLAuth should return a value representing the LAuth auth', async () => {
+    const result = await PreApprovalUtil.getLAuth();
+    expect(result).toBeDefined(); // Replace with expected result if known
+  });
+  
+  // You can add more tests for other methods
 });
