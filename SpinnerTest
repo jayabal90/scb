@@ -1,44 +1,37 @@
-// actions.test.ts
-import configureMockStore from 'redux-mock-store';
-import thunk from 'redux-thunk';
+import React from 'react';
+import { render } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import configureStore from 'redux-mock-store';
+import thunk from 'redux-thunk'; // Assume we're using redux-thunk for async actions
+import { dispatchLoader, dispatchError, getLovData } from './yourActionFile'; // Adjust path accordingly
 import axios from 'axios';
-import { getLovData } from './path-to-your-actions'; // Adjust import based on your file structure
-import { lovAction } from '../utils/store/lov-slice';
-import { dispatchError } from '../your-error-dispatch-function'; // Adjust based on your file structure
+import moxios from 'moxios'; // For mocking axios requests
 
-jest.mock('axios');
 const middlewares = [thunk];
-const mockStore = configureMockStore(middlewares);
+const mockStore = configureStore(middlewares);
 
-describe('getLovData action', () => {
-  let store: any;
+describe('Redux Actions', () => {
+  let store;
 
   beforeEach(() => {
     store = mockStore({});
-    jest.clearAllMocks();
+    moxios.install(); // Install moxios for each test
   });
 
-  it('dispatches LOV data on successful fetch', async () => {
-    const mockResponse = {
-      data: [
-        { CODE_DESC: "Option 1", CODE_VALUE: "1" },
-        { CODE_DESC: "Option 2", CODE_VALUE: "2" },
-      ],
-    };
-
-    (axios.get as jest.Mock).mockResolvedValueOnce(mockResponse);
-
-    await store.dispatch(getLovData('testField'));
-
-    const actions = store.getActions();
-
-    expect(actions[0]).toEqual(lovAction.getLovData({
-      label: 'testField',
-      value: mockResponse.data,
-    }));
+  afterEach(() => {
+    moxios.uninstall(); // Uninstall moxios after each test
+    jest.clearAllMocks(); // Clear all mocks
   });
 
-  it('dispatches error action on network failure', async () => {
+  it('dispatches dispatchLoader action', () => {
+    const expectedActions = [
+      { type: 'loader/getState', payload: { isFetching: true } }
+    ];
+    store.dispatch(dispatchLoader(true));
+    expect(store.getActions()).toEqual(expectedActions);
+  });
+
+  it('dispatches dispatchError action with response error', async () => {
     const mockError = {
       response: {
         status: 404,
@@ -46,11 +39,47 @@ describe('getLovData action', () => {
       },
     };
 
-    (axios.get as jest.Mock).mockRejectedValueOnce(mockError);
+    store.dispatch(dispatchError(mockError));
+    
+    const expectedActions = [
+      { type: 'loader/getState', payload: { isFetching: false } },
+      {
+        type: 'error/getError',
+        payload: {
+          statusCode: 404,
+          statusText: 'Not Found',
+        },
+      },
+    ];
 
-    await store.dispatch(getLovData('testField'));
+    expect(store.getActions()).toEqual(expectedActions);
+  });
 
-    const actions = store.getActions();
-    expect(actions).toContainEqual(dispatchError(mockError));
+  it('successfully fetches lov data', async () => {
+    const testField = 'testField';
+    const url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_LOVREF}${testField}`;
+    moxios.stubRequest(url, {
+      status: 200,
+      response: [{ CODE_DESC: 'Test Desc', CODE_VALUE: 'Test Value' }]
+    });
+
+    await store.dispatch(getLovData(testField));
+
+    const expectedActions = [
+      { 
+        type: 'loader/getState', 
+        payload: { isFetching: true } 
+      },
+      { 
+        type: 'lov/getLovData', 
+        payload: { label: testField, value: [{ CODE_DESC: 'Test Desc', CODE_VALUE: 'Test Value' }] } 
+      },
+      { 
+        type: 'loader/getState', 
+        payload: { isFetching: false } 
+      }
+    ];
+
+    expect(store.getActions()).toEqual(expectedActions);
   });
 });
