@@ -1,92 +1,127 @@
-import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { Provider } from 'react-redux';
+import { getFields } from './path/to/getFields';
+import { fieldErrorAction } from '../../../utils/store/field-error-slice';
 import configureStore from 'redux-mock-store';
-import { useSelector as mockUseSelector, useDispatch as mockUseDispatch } from 'react-redux';
-import AuthorizeComponent from './path-to-your-component/AuthorizeComponent'; // Adjust the path accordingly
-import { ValueUpdateAction } from "../../../utils/store/value-update-slice";
-import { checkboxAction } from "../../../utils/store/checkbox-slice";
+import thunk from 'redux-thunk';
+import { act } from 'react-dom/test-utils';
 
-const mockStore = configureStore([]);
+const middlewares = [thunk];
+const mockStore = configureStore(middlewares);
 
-jest.mock('react-redux', () => ({
-  ...jest.requireActual('react-redux'),
-  useSelector: jest.fn(),
-  useDispatch: jest.fn(),
-}));
+describe('getFields action creator', () => {
+    let store;
 
-describe('AuthorizeComponent Tests', () => {
-  let store: any;
-  const mockDispatch = jest.fn();
-
-  beforeEach(() => {
-    store = mockStore({
-      stages: {
-        stages: [{ stageId: 'AD_2', stageInfo: { applicants: [{}] } }],
-      },
-      checkboxSlice: { selectedvalue: '' },
-      fielderror: { error: false },
+    beforeEach(() => {
+        store = mockStore({});
     });
 
-    // Reset mocks
-    mockDispatch.mockClear();
-    (mockUseDispatch as jest.Mock).mockReturnValue(mockDispatch);
-    (mockUseSelector as jest.Mock)
-      .mockImplementation((selectorFn: any) => {
-        // Define what the selector should return based on its input
-        switch (selectorFn(store.getState())) {
-          case store.getState().checkboxSlice.selectedvalue:
-            return '';
-          case store.getState().stages:
-            return store.getState().stages.stages;
-          case store.getState().fielderror:
-            return store.getState().fielderror.error;
-          // Add other cases as needed for your tests
-          default:
-            return null;
-        }
-      });
-  });
+    it('should return null when no getStages are provided', () => {
+        const radioResidency = null;
 
-  it('should render the component correctly', () => {
-    render(
-      <Provider store={store}>
-        <AuthorizeComponent data={{ logical_field_name: 'marketing_post', rwb_label_name: 'Post Marketing' }} handleCallback={jest.fn()} />
-      </Provider>
-    );
+        act(() => {
+            store.dispatch(getFields([], radioResidency));
+        });
 
-    expect(screen.getByLabelText(/Post Marketing/i)).toBeInTheDocument();
-  });
+        const actions = store.getActions();
+        expect(actions).toEqual([]);
+    });
 
-  it('should dispatch the updateCheckbox action when checkbox is changed', () => {
-    render(
-      <Provider store={store}>
-        <AuthorizeComponent data={{ logical_field_name: 'marketing_post', rwb_label_name: 'Post Marketing' }} handleCallback={jest.fn()} />
-      </Provider>
-    );
+    it('should dispatch fieldErrorAction when radioResidency is set and a valid field is present', () => {
+        const radioResidency = {
+            logical_field_name: 'marketing_phone_all',
+            value: 'N'
+        };
 
-    const checkbox = screen.getByLabelText(/Post Marketing/i);
-    fireEvent.click(checkbox);
+        const getStages = [
+            {
+                stageId: 'stage1',
+                stageInfo: {
+                    fieldMetaData: {
+                        data: {
+                            stages: [
+                                {
+                                    fields: [
+                                        { logical_field_name: "marketing_phone_rm" },
+                                        { logical_field_name: "other_field" },
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        ];
 
-    expect(mockDispatch).toHaveBeenCalledWith(ValueUpdateAction.getChangeUpdate(expect.any(Object)));
-    expect(mockDispatch).toHaveBeenCalledWith(checkboxAction.updateCheckbox(expect.any(Array)));
-  });
+        act(() => {
+            store.dispatch(getFields(getStages, radioResidency));
+        });
 
-  it('should show a popup when all checkboxes are unchecked', () => {
-    render(
-      <Provider store={store}>
-        <AuthorizeComponent data={{ logical_field_name: 'marketing_post', rwb_label_name: 'Post Marketing' }} handleCallback={jest.fn()} />
-      </Provider>
-    );
+        const actions = store.getActions();
+        expect(actions).toContainEqual(fieldErrorAction.getMandatoryFields(["marketing_phone_rm"]));
+    });
 
-    const checkbox = screen.getByLabelText(/Post Marketing/i);
-    fireEvent.click(checkbox);
+    it('should not dispatch fieldErrorAction if no fields match', () => {
+        const radioResidency = {
+            logical_field_name: 'marketing_phone_all',
+            value: 'Y'
+        };
 
-    // Simulate scenario where all checkboxes are unchecked
-    fireEvent.click(checkbox); // Uncheck
+        const getStages = [
+            {
+                stageId: 'stage1',
+                stageInfo: {
+                    fieldMetaData: {
+                        data: {
+                            stages: [
+                                {
+                                    fields: [
+                                        { logical_field_name: "some_other_field" }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        ];
 
-    expect(screen.getByText(/empty_check/i)).toBeInTheDocument(); // Assuming "empty_check" is the name of the popup
-  });
+        act(() => {
+            store.dispatch(getFields(getStages, radioResidency));
+        });
 
-  // Additional tests can be added following the same pattern
+        const actions = store.getActions();
+        expect(actions).not.toContainEqual(fieldErrorAction.getMandatoryFields(expect.anything()));
+    });
+
+    it('should return stage components when both ssfStages and fields are available', () => {
+        const radioResidency = {
+            logical_field_name: 'marketing_phone_all',
+            value: 'N'
+        };
+
+        const getStages = [
+            {
+                stageId: 'stage1',
+                stageInfo: {
+                    fieldMetaData: {
+                        data: {
+                            stages: [
+                                {
+                                    fields: [
+                                        { logical_field_name: "marketing_phone_rm" },
+                                        { logical_field_name: "another_field" },
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        ];
+
+        const returnValue = getFields(getStages, radioResidency)(store.dispatch);
+
+        expect(returnValue).toEqual([
+            { logical_field_name: "marketing_phone_rm" }
+        ]);
+    });
 });
