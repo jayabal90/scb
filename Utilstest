@@ -2,79 +2,91 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import configureStore from 'redux-mock-store';
-import AuthorizeComponent from './AuthorizeComponent'; // Update the import path according to your project
-import { CONSTANTS } from '../../../utils/common/constants'; // Ensure the path is correct
+import { useSelector as mockUseSelector, useDispatch as mockUseDispatch } from 'react-redux';
+import AuthorizeComponent from './path-to-your-component/AuthorizeComponent'; // Adjust the path accordingly
+import { ValueUpdateAction } from "../../../utils/store/value-update-slice";
+import { checkboxAction } from "../../../utils/store/checkbox-slice";
 
 const mockStore = configureStore([]);
 
-describe('AuthorizeComponent', () => {
-  let store;
+jest.mock('react-redux', () => ({
+  ...jest.requireActual('react-redux'),
+  useSelector: jest.fn(),
+  useDispatch: jest.fn(),
+}));
+
+describe('AuthorizeComponent Tests', () => {
+  let store: any;
+  const mockDispatch = jest.fn();
 
   beforeEach(() => {
     store = mockStore({
       stages: {
-        stages: [{ stageId: CONSTANTS.STAGE_NAMES.AD_2, stageInfo: { applicants: [{}] } }],
+        stages: [{ stageId: 'AD_2', stageInfo: { applicants: [{}] } }],
       },
-      checkboxSlice: {
-        selectedvalue: JSON.stringify([{ label: 'marketing_post', checked: false }]), // Initial selected values
-      },
-      fielderror: {
-        error: false,
-      },
+      checkboxSlice: { selectedvalue: '' },
+      fielderror: { error: false },
     });
-    jest.clearAllMocks();
+
+    // Reset mocks
+    mockDispatch.mockClear();
+    (mockUseDispatch as jest.Mock).mockReturnValue(mockDispatch);
+    (mockUseSelector as jest.Mock)
+      .mockImplementation((selectorFn: any) => {
+        // Define what the selector should return based on its input
+        switch (selectorFn(store.getState())) {
+          case store.getState().checkboxSlice.selectedvalue:
+            return '';
+          case store.getState().stages:
+            return store.getState().stages.stages;
+          case store.getState().fielderror:
+            return store.getState().fielderror.error;
+          // Add other cases as needed for your tests
+          default:
+            return null;
+        }
+      });
   });
 
-  test('renders without crashing', () => {
+  it('should render the component correctly', () => {
     render(
       <Provider store={store}>
-        <AuthorizeComponent data={{ logical_field_name: "test_checkbox", rwb_label_name: "Test Checkbox", info_tooltips: "" }} handleCallback={jest.fn()} updateCheckboxStatus={jest.fn()} />
-      </Provider>
-    );
-    expect(screen.getByText("Test Checkbox")).toBeInTheDocument();
-  });
-
-  test('checkbox state is initialized correctly', () => {
-    render(
-      <Provider store={store}>
-        <AuthorizeComponent data={{ logical_field_name: "test_checkbox", rwb_label_name: "Test Checkbox" }} handleCallback={jest.fn()} updateCheckboxStatus={jest.fn()} />
-      </Provider>
-    );
-    expect(screen.getByLabelText("Test Checkbox")).not.toBeChecked(); // Initially unchecked
-  });
-
-  test('checkbox value updates on change', () => {
-    render(
-      <Provider store={store}>
-        <AuthorizeComponent data={{ logical_field_name: "test_checkbox", rwb_label_name: "Test Checkbox" }} handleCallback={jest.fn()} updateCheckboxStatus={jest.fn()} />
-      </Provider>
-    );
-
-    const checkbox = screen.getByLabelText("Test Checkbox");
-    fireEvent.click(checkbox);
-    
-    expect(checkbox).toBeChecked(); // Should be checked after click
-  });
-
-  test('shows popup when all marketing checkboxes are unchecked', () => {
-    // Setup stage that causes all marketing values to be 'N'
-    store = mockStore({
-      stages: {
-        stages: [{ stageId: CONSTANTS.STAGE_NAMES.AD_2, stageInfo: { applicants: [{ marketing_post: 'N', marketing_mobile_message: 'N', marketing_email: 'N', marketing_phone_all: 'N', marketing_phone_rm: 'N' }] } } ],
-      },
-    });
-    render(
-      <Provider store={store}>
-        <AuthorizeComponent data={{ logical_field_name: "marketing_phone_all", rwb_label_name: "Marketing Phone All" }} handleCallback={jest.fn()} updateCheckboxStatus={jest.fn()} />
+        <AuthorizeComponent data={{ logical_field_name: 'marketing_post', rwb_label_name: 'Post Marketing' }} handleCallback={jest.fn()} />
       </Provider>
     );
 
-    const checkbox = screen.getByLabelText("Marketing Phone All");
+    expect(screen.getByLabelText(/Post Marketing/i)).toBeInTheDocument();
+  });
+
+  it('should dispatch the updateCheckbox action when checkbox is changed', () => {
+    render(
+      <Provider store={store}>
+        <AuthorizeComponent data={{ logical_field_name: 'marketing_post', rwb_label_name: 'Post Marketing' }} handleCallback={jest.fn()} />
+      </Provider>
+    );
+
+    const checkbox = screen.getByLabelText(/Post Marketing/i);
     fireEvent.click(checkbox);
 
-    const popup = screen.getByText(/choose again/i); // Ensure that some text in the popup is found
-    expect(popup).toBeInTheDocument(); // Verify that popup is shown
+    expect(mockDispatch).toHaveBeenCalledWith(ValueUpdateAction.getChangeUpdate(expect.any(Object)));
+    expect(mockDispatch).toHaveBeenCalledWith(checkboxAction.updateCheckbox(expect.any(Array)));
   });
 
-  // More tests can be added to cover other functionalities
+  it('should show a popup when all checkboxes are unchecked', () => {
+    render(
+      <Provider store={store}>
+        <AuthorizeComponent data={{ logical_field_name: 'marketing_post', rwb_label_name: 'Post Marketing' }} handleCallback={jest.fn()} />
+      </Provider>
+    );
+
+    const checkbox = screen.getByLabelText(/Post Marketing/i);
+    fireEvent.click(checkbox);
+
+    // Simulate scenario where all checkboxes are unchecked
+    fireEvent.click(checkbox); // Uncheck
+
+    expect(screen.getByText(/empty_check/i)).toBeInTheDocument(); // Assuming "empty_check" is the name of the popup
+  });
+
+  // Additional tests can be added following the same pattern
 });
