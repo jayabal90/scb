@@ -1,76 +1,80 @@
-// PreApprovalUtil.test.ts
+import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import configureStore from 'redux-mock-store';
+import AuthorizeComponent from './AuthorizeComponent'; // Update the import path according to your project
+import { CONSTANTS } from '../../../utils/common/constants'; // Ensure the path is correct
 
-import PreApprovalUtil from './PreApprovalUtil';
-import { v4 as uuid } from 'uuid';
+const mockStore = configureStore([]);
 
-// Mocking the store for testing
-jest.mock("../../../utils/store/store", () => ({
-  store: {
-    getState: jest.fn(() => ({
-      stages: {
-        stages: [{
-          stageInfo: {
-            applicants: [{}],
-            application: {},
-            products: [{}],
-            lov_desc: {},
-          }
-        }],
-      },
-      lovDesc: {
-        lovDesc: [
-          { label: "res_city", code_desc: "CityA" },
-          { label: "off_city", code_desc: "CityB" }
-        ],
-      },
-      auth: {
-        sessionUid: "test-session-uid"
-      }
-    }))
-  }
-}));
+describe('AuthorizeComponent', () => {
+  let store;
 
-describe('PreApprovalUtil', () => {
   beforeEach(() => {
+    store = mockStore({
+      stages: {
+        stages: [{ stageId: CONSTANTS.STAGE_NAMES.AD_2, stageInfo: { applicants: [{}] } }],
+      },
+      checkboxSlice: {
+        selectedvalue: JSON.stringify([{ label: 'marketing_post', checked: false }]), // Initial selected values
+      },
+      fielderror: {
+        error: false,
+      },
+    });
     jest.clearAllMocks();
   });
 
-  it('should generate a valid UUID', () => {
-    const uuidResult = PreApprovalUtil.generateUUID();
-    expect(uuid.validate(uuidResult)).toBe(true);
+  test('renders without crashing', () => {
+    render(
+      <Provider store={store}>
+        <AuthorizeComponent data={{ logical_field_name: "test_checkbox", rwb_label_name: "Test Checkbox", info_tooltips: "" }} handleCallback={jest.fn()} updateCheckboxStatus={jest.fn()} />
+      </Provider>
+    );
+    expect(screen.getByText("Test Checkbox")).toBeInTheDocument();
   });
 
-  it('should retrieve applicant fields', () => {
-    const expectedFields = PreApprovalUtil.getApplicantFields();
-    expect(expectedFields).toEqual(expect.any(Array));
-    expect(expectedFields.length).toBeGreaterThan(0); // Expect at least one field.
+  test('checkbox state is initialized correctly', () => {
+    render(
+      <Provider store={store}>
+        <AuthorizeComponent data={{ logical_field_name: "test_checkbox", rwb_label_name: "Test Checkbox" }} handleCallback={jest.fn()} updateCheckboxStatus={jest.fn()} />
+      </Provider>
+    );
+    expect(screen.getByLabelText("Test Checkbox")).not.toBeChecked(); // Initially unchecked
   });
 
-  it('should calculate SHA256 hash correctly', async () => {
-    const input = "test input";
-    const hash = await PreApprovalUtil.getSHA256Hash(input);
-    expect(hash).toMatch(/^[a-f0-9]{64}$/); // SHA-256 hash length
+  test('checkbox value updates on change', () => {
+    render(
+      <Provider store={store}>
+        <AuthorizeComponent data={{ logical_field_name: "test_checkbox", rwb_label_name: "Test Checkbox" }} handleCallback={jest.fn()} updateCheckboxStatus={jest.fn()} />
+      </Provider>
+    );
+
+    const checkbox = screen.getByLabelText("Test Checkbox");
+    fireEvent.click(checkbox);
+    
+    expect(checkbox).toBeChecked(); // Should be checked after click
   });
 
-  it('should get correct authorization metadata for bAuth', async () => {
-    const bAuthValue = await PreApprovalUtil.getBAuth();
-    expect(bAuthValue).toMatch(/^[a-f0-9]{64}$/); // SHA-256 hash length
+  test('shows popup when all marketing checkboxes are unchecked', () => {
+    // Setup stage that causes all marketing values to be 'N'
+    store = mockStore({
+      stages: {
+        stages: [{ stageId: CONSTANTS.STAGE_NAMES.AD_2, stageInfo: { applicants: [{ marketing_post: 'N', marketing_mobile_message: 'N', marketing_email: 'N', marketing_phone_all: 'N', marketing_phone_rm: 'N' }] } } ],
+      },
+    });
+    render(
+      <Provider store={store}>
+        <AuthorizeComponent data={{ logical_field_name: "marketing_phone_all", rwb_label_name: "Marketing Phone All" }} handleCallback={jest.fn()} updateCheckboxStatus={jest.fn()} />
+      </Provider>
+    );
+
+    const checkbox = screen.getByLabelText("Marketing Phone All");
+    fireEvent.click(checkbox);
+
+    const popup = screen.getByText(/choose again/i); // Ensure that some text in the popup is found
+    expect(popup).toBeInTheDocument(); // Verify that popup is shown
   });
 
-  it('should form correct payload in getAckMetaData', () => {
-    const channelReference = 'test-channel-ref';
-    const metaData = PreApprovalUtil.getAckMetaData(channelReference);
-
-    const parsedMetaData = JSON.parse(metaData);
-    expect(parsedMetaData).toHaveProperty('reqId');
-    expect(parsedMetaData).toHaveProperty('Channel', "MOBILE");
-    expect(parsedMetaData).toHaveProperty('loginType', "PRE");
-    expect(parsedMetaData).toHaveProperty('sessionUID', "test-session-uid");
-  });
-
-  it('should retrieve Lov Description Fields', () => {
-    const lovDescriptionFields = PreApprovalUtil.getLovDescriptionFields();
-    expect(lovDescriptionFields).toContain("res_city_a_1_desc");
-    expect(lovDescriptionFields).toContain("off_city_a_1_desc");
-  });
+  // More tests can be added to cover other functionalities
 });
