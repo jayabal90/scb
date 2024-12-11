@@ -1,93 +1,76 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, fireEvent, screen, cleanup } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import configureStore from 'redux-mock-store';
-import Date from './Date'; // Adjust the import path accordingly
-import { userAgeAction } from '../../../utils/store/age-slice';
-import { fieldErrorAction } from '../../../utils/store/field-error-slice';
+import Date from './Date'; // Adjust this path to your actual component location
+import { userAgeAction, fieldErrorAction, lastAction } from '../../../utils/store'; // Adjust your imports
 
 const mockStore = configureStore([]);
-const mockHandleCallback = jest.fn();
-const mockHandleFieldDispatch = jest.fn();
-
-// Mocking the required redux state
 const initialState = {
-    stages: {
-        stages: [{ 
-            stageId: 'ad-2', 
-            stageInfo: {
-                applicants: [{
-                    expiry_date: '',
-                    work_type: 'E002',
-                    id_type_cb: ''
-                }]
-            }
-        }],
-        userInput: {
-            applicants: [{ /* your applicant data */ }]
-        }
-    },
-    fielderror: {
-        error: ''
-    }
+  stages: { stages: [{ stageId: 'ad-2', stageInfo: { applicants: [{ work_type: 'E002' }] } }] },
+  fielderror: { error: null },
+  lastAccessed: { lastField: null }
+};
+
+const setup = (initialState) => {
+  const store = mockStore(initialState);
+
+  render(
+    <Provider store={store}>
+      <Date data={{ logical_field_name: 'test_field', rwb_label_name: 'Test Field', mandatory: "Yes" }} />
+    </Provider>
+  );
+
+  return store;
 };
 
 describe('Date Component', () => {
-    let store; 
+  let store;
 
-    beforeEach(() => {
-        store = mockStore(initialState);
-    });
+  beforeEach(() => {
+    store = setup(initialState);
+  });
 
-    test('renders the Date component', () => {
-        render(
-            <Provider store={store}>
-                <Date data={{ logical_field_name: 'expiry_date', rwb_label_name: 'Expiry Date', mandatory: 'Yes' }} handleCallback={mockHandleCallback} handleFieldDispatch={mockHandleFieldDispatch} />
-            </Provider>
-        );
+  afterEach(() => {
+    cleanup();
+  });
 
-        expect(screen.getByLabelText(/Expiry Date/i)).toBeInTheDocument();
-        expect(screen.getByPlaceholderText('DD')).toBeInTheDocument();
-        expect(screen.getByPlaceholderText('MM')).toBeInTheDocument();
-        expect(screen.getByPlaceholderText('YYYY')).toBeInTheDocument();
-    });
+  it('renders without crashing', () => {
+    expect(screen.getByLabelText('Test Field')).toBeInTheDocument();
+  });
 
-    test('input accepts valid day, month, and year', () => {
-        render(
-            <Provider store={store}>
-                <Date data={{ logical_field_name: 'expiry_date', rwb_label_name: 'Expiry Date', mandatory: 'Yes' }} handleCallback={mockHandleCallback} handleFieldDispatch={mockHandleFieldDispatch} />
-            </Provider>
-        );
+  it('displays error message when invalid date is entered', () => {
+    const dayInput = screen.getByPlaceholderText('DD');
+    const monthInput = screen.getByPlaceholderText('MM');
+    const yearInput = screen.getByPlaceholderText('YYYY');
 
-        const dayInput = screen.getByPlaceholderText('DD');
-        const monthInput = screen.getByPlaceholderText('MM');
-        const yearInput = screen.getByPlaceholderText('YYYY');
+    // Simulate entering invalid date
+    fireEvent.change(dayInput, { target: { value: '32' } });
+    fireEvent.change(monthInput, { target: { value: '13' } });
+    fireEvent.change(yearInput, { target: { value: '2020' } });
 
-        fireEvent.change(dayInput, { target: { value: '15' } });
-        fireEvent.change(monthInput, { target: { value: '08' } });
-        fireEvent.change(yearInput, { target: { value: '2023' } });
+    // Check for error messages, assuming your component sets an error state accordingly
+    expect(screen.getByText(/Date is not valid/i)).toBeInTheDocument();
+  });
 
-        expect(dayInput.value).toBe('15');
-        expect(monthInput.value).toBe('08');
-        expect(yearInput.value).toBe('2023');
-    });
+  it('dispatches actions correctly on valid date', () => {
+    const dayInput = screen.getByPlaceholderText('DD');
+    const monthInput = screen.getByPlaceholderText('MM');
+    const yearInput = screen.getByPlaceholderText('YYYY');
 
-    test('shows error message for invalid date input', () => {
-        render(
-            <Provider store={store}>
-                <Date data={{ logical_field_name: 'expiry_date', rwb_label_name: 'Expiry Date', mandatory: 'Yes' }} handleCallback={mockHandleCallback} handleFieldDispatch={mockHandleFieldDispatch} />
-            </Provider>
-        );
+    // Simulate entering valid date
+    fireEvent.change(dayInput, { target: { value: '15' } });
+    fireEvent.change(monthInput, { target: { value: '05' } });
+    fireEvent.change(yearInput, { target: { value: '2000' } });
 
-        const dayInput = screen.getByPlaceholderText('DD');
-        const monthInput = screen.getByPlaceholderText('MM');
-        const yearInput = screen.getByPlaceholderText('YYYY');
+    // Verify if dispatch is called
+    const actions = store.getActions();
+    expect(actions).toContainEqual(
+      expect.objectContaining({
+        type: fieldErrorAction.removeToggleFieldError.type,
+      })
+    );
+  });
 
-        fireEvent.change(monthInput, { target: { value: '15' } }); // Invalid month
-        fireEvent.blur(monthInput); // Trigger validation
-
-        expect(screen.getByText(/Month is not valid/i)).toBeInTheDocument();
-    });
-
-    // Add more tests as needed for different scenarios...
+  // Add more tests for edge cases and other functionalities
 });
