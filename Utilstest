@@ -1,85 +1,93 @@
-import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
-import { Provider } from "react-redux";
-import configureStore from "redux-mock-store";
-import Submission from "./Submission"; // adjust path as necessary
-import submissionConstant from "../../../assets/_json/submission.json"; 
+import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import configureStore from 'redux-mock-store';
+import Date from './Date'; // Adjust the import path accordingly
+import { userAgeAction } from '../../../utils/store/age-slice';
+import { fieldErrorAction } from '../../../utils/store/field-error-slice';
 
 const mockStore = configureStore([]);
+const mockHandleCallback = jest.fn();
+const mockHandleFieldDispatch = jest.fn();
 
-describe("Submission Component", () => {
-  let store;
+// Mocking the required redux state
+const initialState = {
+    stages: {
+        stages: [{ 
+            stageId: 'ad-2', 
+            stageInfo: {
+                applicants: [{
+                    expiry_date: '',
+                    work_type: 'E002',
+                    id_type_cb: ''
+                }]
+            }
+        }],
+        userInput: {
+            applicants: [{ /* your applicant data */ }]
+        }
+    },
+    fielderror: {
+        error: ''
+    }
+};
 
-  beforeEach(() => {
-    store = mockStore({
-      preApproval: {
-        formConfigmetaData: {
-          products: [{ product_category: "PL" }],
-          application: {
-            application_reference: "TEST_REF_NO",
-          },
-        },
-      },
-    });
-  });
+describe('Date Component', () => {
+    let store; 
 
-  test("renders PL success screen", () => {
-    render(
-      <Provider store={store}>
-        <Submission />
-      </Provider>
-    );
-
-    expect(screen.getByText(submissionConstant.EN.mainText)).toBeInTheDocument();
-    expect(screen.getByText(submissionConstant.EN.nextText)).toBeInTheDocument();
-    expect(screen.getByText(submissionConstant.EN.processingPLText)).toBeInTheDocument();
-    // Check if the feedback link is present and contains the correct URL
-    expect(screen.getByText(/Click here/i).closest('a')).toHaveAttribute('href', `https://surveys.sc.com/jfe/form/SV_9LbvckjbELelJbM?p=PL&m=hk&c=TEST_REF_NO`);
-  });
-
-  test("renders NSTP success screen when product category is different", () => {
-    store = mockStore({
-      preApproval: {
-        formConfigmetaData: {
-          products: [{ product_category: "NSTP" }],
-          application: {
-            application_reference: "TEST_REF_NO",
-          },
-        },
-      },
+    beforeEach(() => {
+        store = mockStore(initialState);
     });
 
-    render(
-      <Provider store={store}>
-        <Submission />
-      </Provider>
-    );
+    test('renders the Date component', () => {
+        render(
+            <Provider store={store}>
+                <Date data={{ logical_field_name: 'expiry_date', rwb_label_name: 'Expiry Date', mandatory: 'Yes' }} handleCallback={mockHandleCallback} handleFieldDispatch={mockHandleFieldDispatch} />
+            </Provider>
+        );
 
-    expect(screen.getByText(submissionConstant.EN.mainText)).toBeInTheDocument();
-    expect(screen.getByText(submissionConstant.EN.nextText)).toBeInTheDocument();
-    expect(screen.getByText(submissionConstant.EN.processingText)).toBeInTheDocument();
-  });
+        expect(screen.getByLabelText(/Expiry Date/i)).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('DD')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('MM')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('YYYY')).toBeInTheDocument();
+    });
 
-  test("displays application reference number", () => {
-    render(
-      <Provider store={store}>
-        <Submission />
-      </Provider>
-    );
+    test('input accepts valid day, month, and year', () => {
+        render(
+            <Provider store={store}>
+                <Date data={{ logical_field_name: 'expiry_date', rwb_label_name: 'Expiry Date', mandatory: 'Yes' }} handleCallback={mockHandleCallback} handleFieldDispatch={mockHandleFieldDispatch} />
+            </Provider>
+        );
 
-    expect(screen.getByText(/HK24101700230315/i)).toBeInTheDocument();
-  });
+        const dayInput = screen.getByPlaceholderText('DD');
+        const monthInput = screen.getByPlaceholderText('MM');
+        const yearInput = screen.getByPlaceholderText('YYYY');
 
-  test("back button works", () => {
-    render(
-      <Provider store={store}>
-        <Submission />
-      </Provider>
-    );
+        fireEvent.change(dayInput, { target: { value: '15' } });
+        fireEvent.change(monthInput, { target: { value: '08' } });
+        fireEvent.change(yearInput, { target: { value: '2023' } });
 
-    const backButton = screen.getByText(submissionConstant.EN.btnPLText);
-    fireEvent.click(backButton);
+        expect(dayInput.value).toBe('15');
+        expect(monthInput.value).toBe('08');
+        expect(yearInput.value).toBe('2023');
+    });
 
-    expect(window.location.href).toEqual(`${process.env.REACT_APP_HOME_PAGE_URL}`);
-  });
+    test('shows error message for invalid date input', () => {
+        render(
+            <Provider store={store}>
+                <Date data={{ logical_field_name: 'expiry_date', rwb_label_name: 'Expiry Date', mandatory: 'Yes' }} handleCallback={mockHandleCallback} handleFieldDispatch={mockHandleFieldDispatch} />
+            </Provider>
+        );
+
+        const dayInput = screen.getByPlaceholderText('DD');
+        const monthInput = screen.getByPlaceholderText('MM');
+        const yearInput = screen.getByPlaceholderText('YYYY');
+
+        fireEvent.change(monthInput, { target: { value: '15' } }); // Invalid month
+        fireEvent.blur(monthInput); // Trigger validation
+
+        expect(screen.getByText(/Month is not valid/i)).toBeInTheDocument();
+    });
+
+    // Add more tests as needed for different scenarios...
 });
