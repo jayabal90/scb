@@ -1,41 +1,131 @@
-import { AppDispatch } from "../../../services/common-service";
-import { FindIndex } from "../../../utils/common/change.utils";
-import { KeyWithAnyModel, RadioDependecyModel, StageDetails } from "../../../utils/model/common-model";
-import { fieldErrorAction } from "../../../utils/store/field-error-slice";
+import "./submission.scss"
+import submissionConstant from "../../../assets/_json/submission.json";
+import { getUrl } from "../../../utils/common/change.utils";
+import { KeyWithAnyModel, StoreModel } from "../../../utils/model/common-model";
+import phoneIcon from '../../../assets/_images/icon-sc-small-icon-sc-s-phone-call.png'
+import { useSelector } from "react-redux";
+import { useEffect, useState } from "react";
+const Submission = () => {
+  const [plSuccessScreen, setPlSuccessScreen] = useState(false);
+  const submissionContent: KeyWithAnyModel = submissionConstant;
+  const language = getUrl.getLanguageInfo("lang");
+  const applicationRefNo = getUrl.getChannelRefNo()?.applicationRefNo;
+  const ref_number = "HK24101700230315"
+  const formConfigmetaData = useSelector((state: StoreModel) => state.preApproval.formConfigmetaData);
+  let lang = '';
+  if (language) {
+    lang = language;
+  } else {
+    lang = 'EN'
+  }
 
-export const getFields = (getStages: Array<StageDetails>, radioResidency: RadioDependecyModel | null): any => {
-    return (dispatch: AppDispatch) => {
-        let fields: Array<KeyWithAnyModel> | undefined;
-        if (getStages && getStages[0]?.stageInfo && getStages[0]?.stageInfo?.fieldMetaData && getStages[0]?.stageInfo?.fieldMetaData?.data?.stages) {
-            const stageId = getStages[0]?.stageId;
-            const stageIndex = FindIndex(getStages[0]?.stageInfo, stageId);
-            fields = getStages[0]?.stageInfo?.fieldMetaData?.data?.stages[stageIndex]?.fields;
-        }
+  useEffect(() => {
+       if(formConfigmetaData?.products[0].product_category==="PL"){
+          setPlSuccessScreen(true)
+       }
+  }, [])
+  
+ const productLink = `https://surveys.sc.com/jfe/form/SV_9LbvckjbELelJbM?&p=${formConfigmetaData?.products[0].product_category}${"&m=hk&c="}${formConfigmetaData?.application.application_reference}`; 
+  
+ const backBtn = () => {
+    window.location.href = `${process.env.REACT_APP_HOME_PAGE_URL}`;
+  }
+  return (
+    <>
+      <div className="main-wrapper submission-view">
+        {/* PL success submission screen*/}
+        {plSuccessScreen ?
+        <div className="ffdDisplayPLNSTP">
+                <div className="banner---sucessPL ffd-2-banner">
+                    <span className="Main-Text">{submissionContent[lang].mainText}</span>
+                </div>
+                <div className="application-content">
+                    <p className="application-f1">{submissionContent[lang].nextText}</p>
+                    <p className="application-f2">{submissionContent[lang].processingPLText}</p>
+                </div>
+                <div className="success-parent-sec1">
+                    <div className="frog-success-survey">
+                      <div>We'd like your feedback!</div>
+                      <div className="thank-you-page-link-survey"><a target="_blank" href={productLink}>Click here</a></div>
+                      <div>to share your experience with us.</div>
+                    </div>
+                </div>
+                <div className="application-content bg-grey">
+                    <p className="application-f1 font-medium">{submissionContent[lang].refNoText} {applicationRefNo?applicationRefNo:""}</p>
+                    <p className="application-f2 font-sm">{submissionContent[lang].refText} </p>
+                    <p className="application-f1 font-medium">{submissionContent[lang].refPLText}</p>
+                    <div className="application-phone">
+                        <div className="application-f3Img">
+                            <p><img className="phone-img" src={phoneIcon} /></p>
+                        </div>
+                        <div className="applicationf3Text">
+                            <p className="application-f3"><b>{submissionContent.phone}</b></p>
+                        </div>
+                    </div>
+                </div>
+                <p className="done-btn bg-green" onClick={backBtn}>{submissionContent[lang].btnPLText}</p>
+            </div>
+            :
+          <div className="ffdDisplayNSTP'">
+          <div className="nstpMobile">
+            <div className="banner---sucess ffd-2-banner">
+              <span className="Main-Text">{submissionContent[lang]?.mainText}</span>
+            </div>
+            <div className="application-content">
+              <p className="application-f1">{submissionContent[lang]?.nextText}</p>
+              <p className="application-f2">{submissionContent[lang]?.processingText}</p>
+              <b className="application-f1">{submissionContent[lang]?.enquiryContent}</b>
+              <p className="contact-info">{submissionContent.phone}</p>
+            </div>
+            <div className="row success-parent-sec1">
+                <div className="frog-success-survey">
+                  <div>We'd like your feedback!</div>
+                  <div className="thank-you-page-link-survey"><a target="_blank" href={productLink}>Click here</a></div>
+                  <div>to share your experience with us.</div>
+                </div>
+            </div>
+            <div className="application-content bg-grey" style={{ margin: '8% auto' }}>
+              <p className="application-f1 font-medium">{submissionContent[lang]?.refNoText} {applicationRefNo ? applicationRefNo : ref_number}</p>
+              <p className="application-f2 font-sm">{submissionContent[lang]?.refText} </p>
+            </div>
+            <div className="hk-copy-rights">
+              <p>{submissionContent[lang]?.scbHkCopyRights}</p>
+            </div>
+            <p className="done-btn bg-button" onClick={backBtn}>{submissionContent[lang]?.btnMobileText}</p>
+          </div>
 
-        let ssfStages: Array<string> | null = null;
+          <div className="nstpDesktop">
+            <div ng-if="ffdDisplay=='NSTP'">
+              <div className="banner---sucess ffd-2-banner">
+                <span className="Main-Text">{submissionContent[lang]?.mainText}</span>
+              </div>
+              <div className="ffd-partision" style={{ height: '100vh' }}>
+                <div className="application-content application-next">
+                  <p className="application-f1">{submissionContent[lang]?.nextText}</p>
+                  <p className="application-f2">{submissionContent[lang]?.processingText}</p>
+                  <div className="hk-copy-rights">
+                    <p>{submissionContent[lang]?.scbHkCopyRights}</p>
+                  </div>
+                  <p className="done-btn bg-button static-button" onClick={backBtn}>{submissionContent[lang]?.btnDeskTopText}</p>
+                </div>
+                <div className="application-ref-section ">
+                  <div className="application-content bg-grey">
+                    <p className="application-contact-image"></p>
+                    <p className="application-f1 font-medium">{submissionContent[lang]?.refNoText} {applicationRefNo ? applicationRefNo : ref_number}</p>
+                    <p className="application-f2 font-sm">{submissionContent[lang]?.contactText} </p>
+                    <b>{submissionContent[lang]?.enquiryContent}</b>
+                    <p className="contact-info">{submissionContent.phone}</p>
+                  </div>
+                </div>
 
-        if (radioResidency) {
-            /* Banking services screen condition */ 
-            if (radioResidency.logical_field_name === 'marketing_phone_all') {
-                let sgYes: Array<string> = [];
-                if (radioResidency.value !== '' && radioResidency.value !== null) {
-                    if (radioResidency.value === 'N') {
-                        sgYes = ["marketing_phone_rm"];
-                    }else {
-                        sgYes = [];
-                    }
-                }
-                ssfStages = sgYes
-            }
+              </div>
+            </div>
+          </div>
+        </div> 
         }
-        
-        if (ssfStages && fields) {
-            dispatch(fieldErrorAction.getMandatoryFields(ssfStages));
-            const stageComponents = fields.filter((field: KeyWithAnyModel) =>
-                ssfStages!.includes(field.logical_field_name)
-            );
-            return stageComponents;
-        }
-        return null;
-    }
+      </div>
+    </>
+  )
 }
+
+export default Submission
