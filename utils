@@ -1,131 +1,531 @@
-import "./submission.scss"
-import submissionConstant from "../../../assets/_json/submission.json";
-import { getUrl } from "../../../utils/common/change.utils";
-import { KeyWithAnyModel, StoreModel } from "../../../utils/model/common-model";
-import phoneIcon from '../../../assets/_images/icon-sc-small-icon-sc-s-phone-call.png'
-import { useSelector } from "react-redux";
 import { useEffect, useState } from "react";
-const Submission = () => {
-  const [plSuccessScreen, setPlSuccessScreen] = useState(false);
-  const submissionContent: KeyWithAnyModel = submissionConstant;
-  const language = getUrl.getLanguageInfo("lang");
-  const applicationRefNo = getUrl.getChannelRefNo()?.applicationRefNo;
-  const ref_number = "HK24101700230315"
-  const formConfigmetaData = useSelector((state: StoreModel) => state.preApproval.formConfigmetaData);
-  let lang = '';
-  if (language) {
-    lang = language;
-  } else {
-    lang = 'EN'
-  }
+import { useDispatch, useSelector } from "react-redux";
+import validateService from "../../../services/validation-service";
+import { fieldError, isFieldUpdate, fieldIdAppend, getUrl } from "../../../utils/common/change.utils";
+import { KeyWithAnyModel, StoreModel } from "../../../utils/model/common-model";
+import "./dates.scss";
+import errorMsg from "../../../assets/_json/error.json";
+import { userAgeAction } from "../../../utils/store/age-slice";
+import { CONSTANTS } from "../../../utils/common/constants";
+import { lastAction } from "../../../utils/store/last-accessed-slice";
+import { fieldErrorAction } from "../../../utils/store/field-error-slice";
+import { nodeModuleNameResolver } from "typescript";
+// import 'font-awesome/css/font-awesome.min.css';
+
+export const Date = (props: KeyWithAnyModel) => {
+  const [date, setDate] = useState({ DD: "", MM: "", YYYY: "" });
+  const [dateVal, setDateVal] = useState("");
+  const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
+  const [tickMark, setTickMark] = useState(false);
+ 
+  const [error, setError] = useState('');
+  const dispatch = useDispatch();
+  const fieldErrorSelector = useSelector(
+    (state: StoreModel) => state.fielderror.error
+  );
+  const applicantsSelector = useSelector(
+    (state: StoreModel) => state.stages.userInput.applicants[0]
+  );
+  const language = getUrl.getLanguageInfo("lang")
+
+  const workType=applicantsSelector.work_type;
+  useEffect(() => {
+
+    if (stageSelector && stageSelector[0] && stageSelector[0].stageInfo && stageSelector[0].stageInfo.applicants[0]) {
+      const storeDate =
+        stageSelector[0].stageInfo.applicants[0][
+        props.data.logical_field_name
+        ];
+      if (storeDate) {
+        let splitDate = storeDate.split("-");
+        setDate({ DD: splitDate[2], MM: splitDate[1], YYYY: splitDate[0] });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const changeHandler = (
+    data: React.ChangeEvent<HTMLInputElement>,
+    type: string
+  ) => {
+    setError('');
+    let nextfield = null;
+    const { maxLength, value } = data.target;
+    if (value.length >= maxLength) {
+      if (type === 'MM') {
+        if (Number(data.target.value) <= 12) {
+          nextfield = document.querySelector(
+            `input[name=${props.data.logical_field_name}_yyyy]`
+          ) as HTMLInputElement | null;
+        }
+      } else if (type === 'DD') {
+        nextfield = document.querySelector(
+          `input[name=${props.data.logical_field_name}_mm]`
+        ) as HTMLInputElement | null;
+      }
+    }
+    if (nextfield !== null) {
+      nextfield.focus();
+    }
+    const fieldName = props.data.logical_field_name;
+    if (type === 'YYYY') {
+      date["YYYY"] = data.target.value;
+    } else if (type === 'MM') {
+      date["MM"] = data.target.value;
+    } else if (type === 'DD') {
+      date["DD"] = data.target.value;
+    }
+    else {
+      date["YYYY"] = data.target.value.split("-")[0];
+      date["MM"] = data.target.value.split("-")[1];
+      date["DD"] = data.target.value.split("-")[2];
+    }
+
+    const userValue = type === 'date' ? data.target.value : date["YYYY"] + "-" + date["MM"] + "-" + date["DD"];
+    let splitDate = userValue.split("-");
+    setDate({ DD: splitDate[2], MM: splitDate[1], YYYY: splitDate[0] });
+    setDateVal(userValue);
+    console.log(date);
+    if (Number(date["MM"]) > 12) {
+      setTickMark(false)
+      setError('Month is not valid');
+      dispatch(
+        fieldErrorAction.getFieldError({
+          fieldName: props.data.logical_field_name,
+        })
+      );
+      return
+    }
+    let year = Number(date["YYYY"]);
+    let isLeap = ((year % 4 == 0) && (year % 100 != 0)) || (year % 400 == 0);
+    console.log(isLeap)
+    if (isLeap && Number(date["DD"]) > 29 && Number(date["MM"]) === 2) {
+      setTickMark(false)
+      setError('Date is not valid');
+      dispatch(
+        fieldErrorAction.getFieldError({
+          fieldName: props.data.logical_field_name,
+        })
+      );
+      return
+    }
+    if (!isLeap && Number(date["DD"]) > 28 && Number(date["MM"]) === 2) {
+      setTickMark(false)
+      setError('Date is not valid');
+      dispatch(
+        fieldErrorAction.getFieldError({
+          fieldName: props.data.logical_field_name,
+        })
+      );
+      return
+    }
+    if (date["YYYY"].length !== 4) {
+      setTickMark(false)
+      setError('Year format wrong');
+      dispatch(
+        fieldErrorAction.getFieldError({
+          fieldName: props.data.logical_field_name,
+        }));
+    }
+    else if (date["MM"].length !== 2) {
+      setTickMark(false)
+      setError('Month format wrong');
+      dispatch(
+        fieldErrorAction.getFieldError({
+          fieldName: props.data.logical_field_name,
+        }));
+    }
+    else if (date["DD"].length !== 2) {
+      setTickMark(false)
+      setError('Day format wrong');
+      dispatch(
+        fieldErrorAction.getFieldError({
+          fieldName: props.data.logical_field_name,
+        }));
+    }
+    else {
+      setTickMark(true)
+      setError('');
+      dispatch(
+        fieldErrorAction.removeToggleFieldError(
+          props.data.logical_field_name,
+        ));
+    }
+    // console.log(date);
+    // const userValue = type === 'date' ? data.target.value : date["YYYY"] + "-" + date["MM"] + "-" + date["DD"];
+    // console.log(userValue);
+    debugger;
+    if (userValue.length !== 10) {
+      setTickMark(false)
+      dispatch(
+        fieldErrorAction.getFieldError({
+          fieldName: props.data.logical_field_name,
+        }));
+    } else {
+      setTickMark(true)
+      dispatch(
+        fieldErrorAction.removeToggleFieldError(
+          props.data.logical_field_name,
+        ));
+
+    }
+    props.handleCallback(props.data, userValue);
+    props.handleFieldDispatch?.(props?.data?.logical_field_name, userValue);
+    if (date["DD"] !== "" || date["MM"] !== "" || date["YYYY"] !== "") {
+      if (date["YYYY"].length > 3 && date["DD"].length > 1 && date["MM"].length > 1) {
+        if (validateService.isValidDate(userValue)) {
+
+          /* Conditions for expiry date*/
+          if (props.data.logical_field_name === 'expiry_date') {
+            let isGreaterThanThirtyDays = validateService.calculateMonth(userValue);
+            if (!isGreaterThanThirtyDays) {
+              if (applicantsSelector.id_type_cb === "Exit-Entry Permit")
+                setError(`${language === CONSTANTS.LANG_EN ? errorMsg.expiry_EEP : language === CONSTANTS.LANG_CN ? errorMsg.expiry_EEP_CN : errorMsg.expiry_EEP_HK}`);
+              else if (applicantsSelector.id_type_cb === "Passport")
+                setError(`${language === CONSTANTS.LANG_EN ? errorMsg.expiry_PASSPORT : language === CONSTANTS.LANG_CN ? errorMsg.expiry_PASSPORT_CN : errorMsg.expiry_PASSPORT_HK}`);
+            } else
+              dispatch(isFieldUpdate(props, userValue, fieldName));
+          }
+
+          /**Validation for date of birth */
+          else if (props.data.logical_field_name === 'date_of_birth') {
+            let age = validateService.calculateAge(userValue);
+            if (age > 99) {
+              setError(`${language === CONSTANTS.LANG_EN ? errorMsg.patterns : language === CONSTANTS.LANG_CN ? errorMsg.patterns_CN : errorMsg.patterns_HK}${props.data.rwb_label_name}`);
+              dispatch(
+                fieldErrorAction.getFieldError({
+                  fieldName: props.data.logical_field_name,
+                }));
+            } else if (age < 18) {
+              dispatch(
+                fieldErrorAction.getFieldError({
+                  fieldName: props.data.logical_field_name,
+                }));
+              setError(`${language === CONSTANTS.LANG_EN ? errorMsg.patterns : language === CONSTANTS.LANG_CN ? errorMsg.patterns_CN : errorMsg.patterns_HK}${props.data.rwb_label_name}`);
+            } else {
+              dispatch(userAgeAction.addUserAge({ userAge: age }))
+              dispatch(isFieldUpdate(props, userValue, fieldName));
+            }
+          }
+        }
+        else {
+          if (props.data.logical_field_name === 'expiry_date') {
+            setError(`${language === CONSTANTS.LANG_EN ? errorMsg.patterns : language === CONSTANTS.LANG_CN ? errorMsg.patterns_CN : errorMsg.patterns_HK}${props.data.rwb_label_name}`);
+
+          } else {
+            setError(`${language === CONSTANTS.LANG_EN ? errorMsg.emity : language === CONSTANTS.LANG_CN ? errorMsg.emity_CN : errorMsg.emity_HK}${props.data.rwb_label_name}`);
+          }
+        }
+      } else {
+        if (props.data.logical_field_name === 'expiry_date') {
+          setError(`${language === CONSTANTS.LANG_EN ? errorMsg.patterns : language === CONSTANTS.LANG_CN ? errorMsg.patterns_CN : errorMsg.patterns_HK}${props.data.rwb_label_name}`);
+
+        } else {
+          setError(`${language === CONSTANTS.LANG_EN ? errorMsg.emity : language === CONSTANTS.LANG_CN ? errorMsg.emity_CN : errorMsg.emity_HK}${props.data.rwb_label_name}`);
+        }
+      }
+    }
+    else if (props.data.mandatory === "Yes" || props.data.mandatory === "Conditional") {
+      if (props.data.logical_field_name === 'expiry_date') {
+        setError(`${language === CONSTANTS.LANG_EN ? errorMsg.patterns : language === CONSTANTS.LANG_CN ? errorMsg.patterns_CN : errorMsg.patterns_HK}${props.data.rwb_label_name}`);
+
+      } else {
+        setError(`${language === CONSTANTS.LANG_EN ? errorMsg.emity : language === CONSTANTS.LANG_CN ? errorMsg.emity_CN : errorMsg.emity_HK}${props.data.rwb_label_name}`);
+      }
+    }
+  };
+
+  const bindHandler = (data: any, type: string) => {
+    if ((type === "DD" || type === "MM") && data.target.value && parseInt(data.target.value) > 0 && (data.target.value).length < 2) {
+      date[type] = `0${data.target.value}`;
+      data.target.value = date[type];
+      changeHandler(data, type);
+    }
+  };
 
   useEffect(() => {
-       if(formConfigmetaData?.products[0].product_category==="PL"){
-          setPlSuccessScreen(true)
-       }
-  }, [])
-  
- const productLink = `https://surveys.sc.com/jfe/form/SV_9LbvckjbELelJbM?&p=${formConfigmetaData?.products[0].product_category}${"&m=hk&c="}${formConfigmetaData?.application.application_reference}`; 
-  
- const backBtn = () => {
-    window.location.href = `${process.env.REACT_APP_HOME_PAGE_URL}`;
-  }
+    if (stageSelector && stageSelector[0] && stageSelector[0].stageInfo && stageSelector[0].stageInfo.applicants[0]) {
+      const storeDate =
+        stageSelector[0].stageInfo.applicants[0][
+        props.data.logical_field_name
+        ];
+      if (storeDate) {
+        let splitDate = storeDate.split("-");
+        setDate({ DD: splitDate[2], MM: splitDate[1], YYYY: splitDate[0] });
+      }
+    }
+  }, [stageSelector, props.data && props.data.logical_field_name]);
+
+  useEffect(() => {
+    if (props.data && props.data.logical_field_name === 'expiry_date') {
+      if (applicantsSelector.expiry_date) {
+        setDate({ DD: "", MM: "", YYYY: "" });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicantsSelector.id_type_cb])
+
+  useEffect(() => {
+    //setErrors(fieldError(fieldErrorSelector, props));
+    if (fieldError(fieldErrorSelector, props)) {
+      if (props.data.logical_field_name === 'expiry_date') {
+        setError(`${language === CONSTANTS.LANG_EN ? errorMsg.patterns : language === CONSTANTS.LANG_CN ? errorMsg.patterns_CN : errorMsg.patterns_HK}${props.data.rwb_label_name}`);
+
+      } else {
+        setError(`${language === CONSTANTS.LANG_EN ? errorMsg.emity : language === CONSTANTS.LANG_CN ? errorMsg.emity_CN : errorMsg.emity_HK}${props.data.rwb_label_name}`);
+      }
+    } else {
+      setError('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldErrorSelector]);
+
+  const allowOnlyCharacter = (event: React.KeyboardEvent<HTMLInputElement>, fieldName: string) => {
+    validateService.allowOnlyCharacter(event, fieldName);
+  };
+
+  useEffect(() => {
+    if (error === (language === CONSTANTS.LANG_EN ? errorMsg.expiry_EEP : language === CONSTANTS.LANG_CN ? errorMsg.expiry_EEP_CN : errorMsg.expiry_EEP_HK))
+      setError(`${language === CONSTANTS.LANG_EN ? errorMsg.expiry_PASSPORT : language === CONSTANTS.LANG_CN ? errorMsg.expiry_PASSPORT_CN : errorMsg.expiry_PASSPORT_HK}`);
+    else if (error === (language === CONSTANTS.LANG_EN ? errorMsg.expiry_PASSPORT : language === CONSTANTS.LANG_CN ? errorMsg.expiry_PASSPORT_CN : errorMsg.expiry_PASSPORT_HK))
+      setError(`${language === CONSTANTS.LANG_EN ? errorMsg.expiry_EEP : language === CONSTANTS.LANG_CN ? errorMsg.expiry_EEP_CN : errorMsg.expiry_EEP_HK}`);
+    if (props.data && props.data.logical_field_name === 'expiry_date') {
+      if (applicantsSelector.expiry_date) {
+        setDate({ DD: "", MM: "", YYYY: "" });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicantsSelector.id_type_cb])
+
+  const focusHandler = (
+    fieldName: string,
+    event: React.FocusEvent<HTMLInputElement>
+  ) => {
+    dispatch(lastAction.getField(fieldName));
+  };
+
   return (
     <>
-      <div className="main-wrapper submission-view">
-        {/* PL success submission screen*/}
-        {plSuccessScreen ?
-        <div className="ffdDisplayPLNSTP">
-                <div className="banner---sucessPL ffd-2-banner">
-                    <span className="Main-Text">{submissionContent[lang].mainText}</span>
-                </div>
-                <div className="application-content">
-                    <p className="application-f1">{submissionContent[lang].nextText}</p>
-                    <p className="application-f2">{submissionContent[lang].processingPLText}</p>
-                </div>
-                <div className="success-parent-sec1">
-                    <div className="frog-success-survey">
-                      <div>We'd like your feedback!</div>
-                      <div className="thank-you-page-link-survey"><a target="_blank" href={productLink}>Click here</a></div>
-                      <div>to share your experience with us.</div>
-                    </div>
-                </div>
-                <div className="application-content bg-grey">
-                    <p className="application-f1 font-medium">{submissionContent[lang].refNoText} {applicationRefNo?applicationRefNo:""}</p>
-                    <p className="application-f2 font-sm">{submissionContent[lang].refText} </p>
-                    <p className="application-f1 font-medium">{submissionContent[lang].refPLText}</p>
-                    <div className="application-phone">
-                        <div className="application-f3Img">
-                            <p><img className="phone-img" src={phoneIcon} /></p>
-                        </div>
-                        <div className="applicationf3Text">
-                            <p className="application-f3"><b>{submissionContent.phone}</b></p>
-                        </div>
-                    </div>
-                </div>
-                <p className="done-btn bg-green" onClick={backBtn}>{submissionContent[lang].btnPLText}</p>
-            </div>
-            :
-          <div className="ffdDisplayNSTP'">
-          <div className="nstpMobile">
-            <div className="banner---sucess ffd-2-banner">
-              <span className="Main-Text">{submissionContent[lang]?.mainText}</span>
-            </div>
-            <div className="application-content">
-              <p className="application-f1">{submissionContent[lang]?.nextText}</p>
-              <p className="application-f2">{submissionContent[lang]?.processingText}</p>
-              <b className="application-f1">{submissionContent[lang]?.enquiryContent}</b>
-              <p className="contact-info">{submissionContent.phone}</p>
-            </div>
-            <div className="row success-parent-sec1">
-                <div className="frog-success-survey">
-                  <div>We'd like your feedback!</div>
-                  <div className="thank-you-page-link-survey"><a target="_blank" href={productLink}>Click here</a></div>
-                  <div>to share your experience with us.</div>
-                </div>
-            </div>
-            <div className="application-content bg-grey" style={{ margin: '8% auto' }}>
-              <p className="application-f1 font-medium">{submissionContent[lang]?.refNoText} {applicationRefNo ? applicationRefNo : ref_number}</p>
-              <p className="application-f2 font-sm">{submissionContent[lang]?.refText} </p>
-            </div>
-            <div className="hk-copy-rights">
-              <p>{submissionContent[lang]?.scbHkCopyRights}</p>
-            </div>
-            <p className="done-btn bg-button" onClick={backBtn}>{submissionContent[lang]?.btnMobileText}</p>
-          </div>
+      {(stageSelector[0].stageId === 'ad-2' &&
+        workType === 'E002' || workType === 'E001' || workType === 'E103' || workType === 'E104') &&
+        props && props.data &&
+        <div className="date">
+          <label htmlFor={props.data.logical_field_name} className="text-label tick-enabled">
+            {!error && tickMark &&
+              <div className="tick-class"></div>
+            }
+            {/* {!error && tickMark ? 
+          <span  className='span-align'>
+              {props.data.rwb_label_name}
+          </span>
+          :
+          <span>
+              {props.data.rwb_label_name}
+          </span>
+          } */}
+            <span> {props.data.rwb_label_name}</span>
 
-          <div className="nstpDesktop">
-            <div ng-if="ffdDisplay=='NSTP'">
-              <div className="banner---sucess ffd-2-banner">
-                <span className="Main-Text">{submissionContent[lang]?.mainText}</span>
-              </div>
-              <div className="ffd-partision" style={{ height: '100vh' }}>
-                <div className="application-content application-next">
-                  <p className="application-f1">{submissionContent[lang]?.nextText}</p>
-                  <p className="application-f2">{submissionContent[lang]?.processingText}</p>
-                  <div className="hk-copy-rights">
-                    <p>{submissionContent[lang]?.scbHkCopyRights}</p>
-                  </div>
-                  <p className="done-btn bg-button static-button" onClick={backBtn}>{submissionContent[lang]?.btnDeskTopText}</p>
-                </div>
-                <div className="application-ref-section ">
-                  <div className="application-content bg-grey">
-                    <p className="application-contact-image"></p>
-                    <p className="application-f1 font-medium">{submissionContent[lang]?.refNoText} {applicationRefNo ? applicationRefNo : ref_number}</p>
-                    <p className="application-f2 font-sm">{submissionContent[lang]?.contactText} </p>
-                    <b>{submissionContent[lang]?.enquiryContent}</b>
-                    <p className="contact-info">{submissionContent.phone}</p>
-                  </div>
-                </div>
-
-              </div>
-            </div>
+            {/* {props.data.rwb_label_name} */}
+          </label>
+          <div className="date__inputs" id={fieldIdAppend(props)}>
+            {/* <div className="input-group__input d-flex align-items-center justify-content-between" id={fieldIdAppend(props)}> */}
+            <input
+              placeholder="DD"
+              minLength={2}
+              maxLength={2}
+              type="tel"
+              value={date.DD}
+              // required={
+              //   props.data.mandatory === "Yes" || "Conditional" ? true : false
+              // }
+              onChange={(event) => changeHandler(event, "DD")}
+              onKeyPress={(event) =>
+                allowOnlyCharacter(event, props.data.logical_field_name)
+              }
+              onBlur={(event) => bindHandler(event, "DD")}
+              onFocus={focusHandler.bind(this, props.data.logical_field_name)}
+              disabled={props.data.editable}
+              className={error && 'input-error'}
+              name={props.data.logical_field_name + '_dd'}
+              id={props.data.logical_field_name + '_dd'}
+              autoComplete="off"
+            />
+            <span className="date-separators-m"></span>
+            <input
+              placeholder="MM"
+              minLength={2}
+              maxLength={2}
+              type="tel"
+              value={date.MM}
+              // required={
+              //   props.data.mandatory === "Yes" || "Conditional" ? true : false
+              // }
+              onChange={(event) => changeHandler(event, "MM")}
+              onKeyPress={(event) =>
+                allowOnlyCharacter(event, props.data.logical_field_name)
+              }
+              onBlur={(event) => bindHandler(event, "MM")}
+              onFocus={focusHandler.bind(this, props.data.logical_field_name)}
+              disabled={props.data.editable}
+              className={error && 'input-error'}
+              name={props.data.logical_field_name + '_mm'}
+              id={props.data.logical_field_name + '_mm'}
+              autoComplete="off"
+            />
+            <span className="date-separators-m"></span>
+            <input
+              title="year-input"
+              placeholder="YYYY"
+              minLength={4}
+              maxLength={4}
+              type="tel"
+              value={date.YYYY}
+              // required={
+              //   props.data.mandatory === "Yes" || "Conditional" ? true : false
+              // }
+              onChange={(event) => changeHandler(event, "YYYY")}
+              onKeyPress={(event) =>
+                allowOnlyCharacter(event, props.data.logical_field_name)
+              }
+              onFocus={focusHandler.bind(this, props.data.logical_field_name)}
+              disabled={props.data.editable}
+              className={error && 'input-error'}
+              name={props.data.logical_field_name + '_yyyy'}
+              id={props.data.logical_field_name + '_yyyy'}
+              autoComplete="off"
+            />
+            {/* <input
+            className="date_icon"
+           // placeholder="yyyy"
+            style={{width: 20}}
+            // minLength={4}
+            // maxLength={4}
+            type="date"
+            value={dateVal}
+            // required={
+            //   props.data.mandatory === "Yes" || "Conditional" ? true : false
+            // }
+            onChange={(event) => changeHandler(event, "date")}
+            // onKeyPress={(event) =>
+            //   allowOnlyCharacter(event, props.data.logical_field_name)
+            // }
+            // onFocus={focusHandler.bind(this, props.data.logical_field_name)}
+            // disabled={props.data.editable}
+            // className={error && 'input-error'}
+            // name={props.data.logical_field_name + '_yyyy'}
+            // id={props.data.logical_field_name + '_yyyy'}
+            // autoComplete="off"
+          /> */}
           </div>
-        </div> 
+        </div>
+      }
+      {(workType !== 'S103' && stageSelector[0].stageId === 'pd-1')&&
+        props && props.data &&
+        <div className="date">
+          <label htmlFor={props.data.logical_field_name} className="text-label tick-enabled">
+            {!error && tickMark &&
+              <div className="tick-class"></div>
+            }
+            <span> {props.data.rwb_label_name}</span>
+
+            {/* {props.data.rwb_label_name} */}
+          </label>
+          <div className="date__inputs" id={fieldIdAppend(props)}>
+            {/* <div className="input-group__input d-flex align-items-center justify-content-between" id={fieldIdAppend(props)}> */}
+            <input
+              placeholder="DD"
+              minLength={2}
+              maxLength={2}
+              type="tel"
+              value={date.DD}
+              // required={
+              //   props.data.mandatory === "Yes" || "Conditional" ? true : false
+              // }
+              onChange={(event) => changeHandler(event, "DD")}
+              onKeyPress={(event) =>
+                allowOnlyCharacter(event, props.data.logical_field_name)
+              }
+              onBlur={(event) => bindHandler(event, "DD")}
+              onFocus={focusHandler.bind(this, props.data.logical_field_name)}
+              disabled={props.data.editable}
+              className={error && 'input-error'}
+              name={props.data.logical_field_name + '_dd'}
+              id={props.data.logical_field_name + '_dd'}
+              autoComplete="off"
+            />
+            <span className="date-separators-m"></span>
+            <input
+              placeholder="MM"
+              minLength={2}
+              maxLength={2}
+              type="tel"
+              value={date.MM}
+              // required={
+              //   props.data.mandatory === "Yes" || "Conditional" ? true : false
+              // }
+              onChange={(event) => changeHandler(event, "MM")}
+              onKeyPress={(event) =>
+                allowOnlyCharacter(event, props.data.logical_field_name)
+              }
+              onBlur={(event) => bindHandler(event, "MM")}
+              onFocus={focusHandler.bind(this, props.data.logical_field_name)}
+              disabled={props.data.editable}
+              className={error && 'input-error'}
+              name={props.data.logical_field_name + '_mm'}
+              id={props.data.logical_field_name + '_mm'}
+              autoComplete="off"
+            />
+            <span className="date-separators-m"></span>
+            <input
+              title="year-input"
+              placeholder="YYYY"
+              minLength={4}
+              maxLength={4}
+              type="tel"
+              value={date.YYYY}
+              // required={
+              //   props.data.mandatory === "Yes" || "Conditional" ? true : false
+              // }
+              onChange={(event) => changeHandler(event, "YYYY")}
+              onKeyPress={(event) =>
+                allowOnlyCharacter(event, props.data.logical_field_name)
+              }
+              onFocus={focusHandler.bind(this, props.data.logical_field_name)}
+              disabled={props.data.editable}
+              className={error && 'input-error'}
+              name={props.data.logical_field_name + '_yyyy'}
+              id={props.data.logical_field_name + '_yyyy'}
+              autoComplete="off"
+            />
+            {/* <input
+            className="date_icon"
+           // placeholder="yyyy"
+            style={{width: 20}}
+            // minLength={4}
+            // maxLength={4}
+            type="date"
+            value={dateVal}
+            // required={
+            //   props.data.mandatory === "Yes" || "Conditional" ? true : false
+            // }
+            onChange={(event) => changeHandler(event, "date")}
+            // onKeyPress={(event) =>
+            //   allowOnlyCharacter(event, props.data.logical_field_name)
+            // }
+            // onFocus={focusHandler.bind(this, props.data.logical_field_name)}
+            // disabled={props.data.editable}
+            // className={error && 'input-error'}
+            // name={props.data.logical_field_name + '_yyyy'}
+            // id={props.data.logical_field_name + '_yyyy'}
+            // autoComplete="off"
+          /> */}
+          </div>
+        </div>
         }
-      </div>
-    </>
-  )
-}
 
-export default Submission
+      {error && <div className="error-msg">{error}</div>}
+    </>
+  );
+};
+
+export default Date;
