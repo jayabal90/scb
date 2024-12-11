@@ -1,127 +1,85 @@
-import { getFields } from './path/to/getFields';
-import { fieldErrorAction } from '../../../utils/store/field-error-slice';
-import configureStore from 'redux-mock-store';
-import thunk from 'redux-thunk';
-import { act } from 'react-dom/test-utils';
+import React from "react";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { Provider } from "react-redux";
+import configureStore from "redux-mock-store";
+import Submission from "./Submission"; // adjust path as necessary
+import submissionConstant from "../../../assets/_json/submission.json"; 
 
-const middlewares = [thunk];
-const mockStore = configureStore(middlewares);
+const mockStore = configureStore([]);
 
-describe('getFields action creator', () => {
-    let store;
+describe("Submission Component", () => {
+  let store;
 
-    beforeEach(() => {
-        store = mockStore({});
+  beforeEach(() => {
+    store = mockStore({
+      preApproval: {
+        formConfigmetaData: {
+          products: [{ product_category: "PL" }],
+          application: {
+            application_reference: "TEST_REF_NO",
+          },
+        },
+      },
+    });
+  });
+
+  test("renders PL success screen", () => {
+    render(
+      <Provider store={store}>
+        <Submission />
+      </Provider>
+    );
+
+    expect(screen.getByText(submissionConstant.EN.mainText)).toBeInTheDocument();
+    expect(screen.getByText(submissionConstant.EN.nextText)).toBeInTheDocument();
+    expect(screen.getByText(submissionConstant.EN.processingPLText)).toBeInTheDocument();
+    // Check if the feedback link is present and contains the correct URL
+    expect(screen.getByText(/Click here/i).closest('a')).toHaveAttribute('href', `https://surveys.sc.com/jfe/form/SV_9LbvckjbELelJbM?p=PL&m=hk&c=TEST_REF_NO`);
+  });
+
+  test("renders NSTP success screen when product category is different", () => {
+    store = mockStore({
+      preApproval: {
+        formConfigmetaData: {
+          products: [{ product_category: "NSTP" }],
+          application: {
+            application_reference: "TEST_REF_NO",
+          },
+        },
+      },
     });
 
-    it('should return null when no getStages are provided', () => {
-        const radioResidency = null;
+    render(
+      <Provider store={store}>
+        <Submission />
+      </Provider>
+    );
 
-        act(() => {
-            store.dispatch(getFields([], radioResidency));
-        });
+    expect(screen.getByText(submissionConstant.EN.mainText)).toBeInTheDocument();
+    expect(screen.getByText(submissionConstant.EN.nextText)).toBeInTheDocument();
+    expect(screen.getByText(submissionConstant.EN.processingText)).toBeInTheDocument();
+  });
 
-        const actions = store.getActions();
-        expect(actions).toEqual([]);
-    });
+  test("displays application reference number", () => {
+    render(
+      <Provider store={store}>
+        <Submission />
+      </Provider>
+    );
 
-    it('should dispatch fieldErrorAction when radioResidency is set and a valid field is present', () => {
-        const radioResidency = {
-            logical_field_name: 'marketing_phone_all',
-            value: 'N'
-        };
+    expect(screen.getByText(/HK24101700230315/i)).toBeInTheDocument();
+  });
 
-        const getStages = [
-            {
-                stageId: 'stage1',
-                stageInfo: {
-                    fieldMetaData: {
-                        data: {
-                            stages: [
-                                {
-                                    fields: [
-                                        { logical_field_name: "marketing_phone_rm" },
-                                        { logical_field_name: "other_field" },
-                                    ]
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        ];
+  test("back button works", () => {
+    render(
+      <Provider store={store}>
+        <Submission />
+      </Provider>
+    );
 
-        act(() => {
-            store.dispatch(getFields(getStages, radioResidency));
-        });
+    const backButton = screen.getByText(submissionConstant.EN.btnPLText);
+    fireEvent.click(backButton);
 
-        const actions = store.getActions();
-        expect(actions).toContainEqual(fieldErrorAction.getMandatoryFields(["marketing_phone_rm"]));
-    });
-
-    it('should not dispatch fieldErrorAction if no fields match', () => {
-        const radioResidency = {
-            logical_field_name: 'marketing_phone_all',
-            value: 'Y'
-        };
-
-        const getStages = [
-            {
-                stageId: 'stage1',
-                stageInfo: {
-                    fieldMetaData: {
-                        data: {
-                            stages: [
-                                {
-                                    fields: [
-                                        { logical_field_name: "some_other_field" }
-                                    ]
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        ];
-
-        act(() => {
-            store.dispatch(getFields(getStages, radioResidency));
-        });
-
-        const actions = store.getActions();
-        expect(actions).not.toContainEqual(fieldErrorAction.getMandatoryFields(expect.anything()));
-    });
-
-    it('should return stage components when both ssfStages and fields are available', () => {
-        const radioResidency = {
-            logical_field_name: 'marketing_phone_all',
-            value: 'N'
-        };
-
-        const getStages = [
-            {
-                stageId: 'stage1',
-                stageInfo: {
-                    fieldMetaData: {
-                        data: {
-                            stages: [
-                                {
-                                    fields: [
-                                        { logical_field_name: "marketing_phone_rm" },
-                                        { logical_field_name: "another_field" },
-                                    ]
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        ];
-
-        const returnValue = getFields(getStages, radioResidency)(store.dispatch);
-
-        expect(returnValue).toEqual([
-            { logical_field_name: "marketing_phone_rm" }
-        ]);
-    });
+    expect(window.location.href).toEqual(`${process.env.REACT_APP_HOME_PAGE_URL}`);
+  });
 });
