@@ -1,122 +1,125 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import Date from './Date';
-import * as redux from 'react-redux';
-import validateService from '../../../services/validation-service';
-import { fieldErrorAction } from '../../../utils/store/field-error-slice';
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import configureStore from 'redux-mock-store';
+import Display from './Display';
+import { StoreModel } from '../../../utils/model/common-model';
 
-// Mock the necessary Redux hooks and components
-jest.mock('react-redux');
+const mockStore = configureStore([]);
 
-describe('Date Component', () => {
-  const initialProps = {
-    data: {
-      logical_field_name: 'expiry_date',
-      rwb_label_name: 'Expiry Date',
-      editable: false,
-      mandatory: 'Yes'
-    },
-    handleCallback: jest.fn(),
-    handleFieldDispatch: jest.fn(),
-  };
+const initialState = {
+  stages: {
+    stages: [
+      {
+        stageInfo: {
+          applicants: [
+            {
+              res_name_of_street_1: null,
+              res_building_estate_1: null,
+              res_room_flat_1: null,
+              alt_address_same_as_res_address_2: 'N',
+              alt_address_same_as_res_address_3: 'N',
+              marketing_email: 'Y'
+            },
+          ],
+        },
+      },
+    ],
+  },
+  lovDesc: {},
+};
+
+const renderWithStore = (store) => (
+  <Provider store={store}>
+    <Display data={{ logical_field_name: "marketing_questionaires" }} />
+  </Provider>
+);
+
+describe('<Display />', () => {
+  let store;
 
   beforeEach(() => {
-    // Reset mocks before each test
-    jest.clearAllMocks();
-
-    // Mocking the redux hooks
-    redux.useSelector.mockImplementation((selector) => {
-      return {
-        stages: {
-          stages: [{ 
-            stageId: 'ad-2',
-            stageInfo: {
-              applicants: [{ expiry_date: '2023-05-25' }] 
-            } 
-          }],
-          userInput: {
-            applicants: [{ work_type: 'E002', id_type_cb: 'Passport' }]
-          }
-        },
-        fielderror: {
-          error: {}
-        }
-      }[selector.name];
-    });
-
-    redux.useDispatch.mockReturnValue(jest.fn());
+    store = mockStore(initialState);
   });
 
-  test('renders date inputs correctly', () => {
-    render(<Date {...initialProps} />);
-
-    expect(screen.getByPlaceholderText('DD')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('MM')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('YYYY')).toBeInTheDocument();
-  });
-
-  test('changes DD input value correctly', () => {
-    render(<Date {...initialProps} />);
-
-    const ddInput = screen.getByPlaceholderText('DD');
-
-    fireEvent.change(ddInput, { target: { value: '15' } });
-    
-    expect(ddInput.value).toBe('15');
-  });
-
-  test('shows error for invalid month', () => {
-    render(<Date {...initialProps} />);
-
-    const mmInput = screen.getByPlaceholderText('MM');
-    
-    fireEvent.change(mmInput, { target: { value: '13' } });
-    fireEvent.blur(mmInput);
-
-    expect(screen.getByText(/Month is not valid/i)).toBeInTheDocument();
-  });
-
-  test('shows error for invalid date', () => {
-    render(<Date {...initialProps} />);
-
-    const ddInput = screen.getByPlaceholderText('DD');
-    const mmInput = screen.getByPlaceholderText('MM');
-    const yyyyInput = screen.getByPlaceholderText('YYYY');
-
-    fireEvent.change(ddInput, { target: { value: '29' } });
-    fireEvent.change(mmInput, { target: { value: '02' } });
-    fireEvent.change(yyyyInput, { target: { value: '2021' } });
-    fireEvent.blur(ddInput); // Trigger validation
-    
-    expect(screen.getByText(/Date is not valid/i)).toBeInTheDocument();
-  });
-
-  test('valid input does not show error', () => {
-    render(<Date {...initialProps} />);
-
-    const ddInput = screen.getByPlaceholderText('DD');
-    const mmInput = screen.getByPlaceholderText('MM');
-    const yyyyInput = screen.getByPlaceholderText('YYYY');
-
-    fireEvent.change(ddInput, { target: { value: '29' } });
-    fireEvent.change(mmInput, { target: { value: '02' } });
-    fireEvent.change(yyyyInput, { target: { value: '2020' } });
-    fireEvent.blur(yyyyInput); // Trigger validation
-
-    expect(screen.queryByText(/Date is not valid/i)).not.toBeInTheDocument();
+  test('renders marketing_questionaires field correctly', () => {
+    renderWithStore(store);
+    expect(screen.getByText(/Email/i)).toBeInTheDocument();
   });
   
-  test('calls handleCallback with the correct parameters', () => {
-    render(<Date {...initialProps} />);
-
-    const ddInput = screen.getByPlaceholderText('DD');
-    const mmInput = screen.getByPlaceholderText('MM');
-    const yyyyInput = screen.getByPlaceholderText('YYYY');
-
-    fireEvent.change(ddInput, { target: { value: '15' } });
-    fireEvent.change(mmInput, { target: { value: '05' } });
-    fireEvent.change(yyyyInput, { target: { value: '2023' } });
-    fireEvent.blur(yyyyInput); // Trigger validation
-
-    expect(initialProps.handleCallback).toHaveBeenCalledWith(initialProps.data, '2023-05-15');
+  test('does not display field when condition not met', () => {
+    store = mockStore({
+      ...initialState,
+      stages: {
+        ...initialState.stages,
+        stages: [
+          {
+            stageInfo: {
+              applicants: [
+                {
+                  res_name_of_street_1: '',
+                  res_building_estate_1: '',
+                  res_room_flat_1: '',
+                  alt_address_same_as_res_address_2: 'Y',
+                  alt_address_same_as_res_address_3: 'Y'
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+    
+    renderWithStore(store);
+    expect(screen.queryByText(/Email/i)).not.toBeInTheDocument(); // Adjust depending on the field.
   });
+
+  test('displays HKID field correctly', () => {
+    store = mockStore({
+      ...initialState,
+      stages: {
+        ...initialState.stages,
+        stages: [
+          {
+            stageInfo: {
+              applicants: [
+                {
+                  HKID: 'A123456(7)'
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+
+    renderWithStore(store);
+    expect(screen.getByText(/A-123456-7/i)).toBeInTheDocument(); // Format as per getfieldValue for HKID.
+  });
+  
+  test('displays the component for amount correctly', () => {
+    store = mockStore({
+      ...initialState,
+      stages: {
+        ...initialState.stages,
+        stages: [
+          {
+            stageInfo: {
+              applicants: [
+                {
+                  amount_field: '20000'
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+
+    renderWithStore(store);
+    expect(screen.getByText(/HKD 20,000.00/i)).toBeInTheDocument();
+  });
+
+  // Add more tests according to your requirements.
+
 });
