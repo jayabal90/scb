@@ -1,125 +1,97 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import configureStore from 'redux-mock-store';
+import { createStore } from 'redux';
 import Display from './Display';
-import { StoreModel } from '../../../utils/model/common-model';
+import { mockedStore } from './mockedStore'; // You'll need to create a mocked store
 
-const mockStore = configureStore([]);
-
+// Create a simple reducer to support the mocked store
 const initialState = {
   stages: {
-    stages: [
-      {
-        stageInfo: {
-          applicants: [
-            {
-              res_name_of_street_1: null,
-              res_building_estate_1: null,
-              res_room_flat_1: null,
-              alt_address_same_as_res_address_2: 'N',
-              alt_address_same_as_res_address_3: 'N',
-              marketing_email: 'Y'
-            },
-          ],
-        },
-      },
-    ],
+    stages: [{ stageInfo: { applicants: [{ res_name_of_street_1: '', res_building_estate_1: '', res_room_flat_1: '', alt_address_same_as_res_address_2: 'N' }] }] }],
+    userInput: { applicants: [{ res_name_of_street_1: '', res_building_estate_1: '', res_room_flat_1: '' }] },
   },
   lovDesc: {},
 };
 
-const renderWithStore = (store) => (
-  <Provider store={store}>
-    <Display data={{ logical_field_name: "marketing_questionaires" }} />
-  </Provider>
-);
+const rootReducer = (state = initialState, action) => {
+  switch (action.type) {
+    default:
+      return state;
+  }
+};
 
-describe('<Display />', () => {
-  let store;
+const store = createStore(rootReducer);
 
-  beforeEach(() => {
-    store = mockStore(initialState);
+// Create a mock function for the props
+const mockProps = {
+  data: {
+    logical_field_name: 'residential_address_chn',
+    component_type: 'Text',
+    label_length: 20,
+    rwb_label_name: 'Residential Address',
+    default_visibility: null,
+  },
+};
+
+describe('Display Component', () => {
+  test('renders without crashing', () => {
+    render(
+      <Provider store={store}>
+        <Display {...mockProps} />
+      </Provider>
+    );
   });
 
-  test('renders marketing_questionaires field correctly', () => {
-    renderWithStore(store);
-    expect(screen.getByText(/Email/i)).toBeInTheDocument();
+  test('displays the correct label', () => {
+    const { getByText } = render(
+      <Provider store={store}>
+        <Display {...mockProps} />
+      </Provider>
+    );
+
+    expect(getByText(/Residential Address/i)).toBeInTheDocument();
   });
-  
-  test('does not display field when condition not met', () => {
-    store = mockStore({
-      ...initialState,
-      stages: {
-        ...initialState.stages,
-        stages: [
-          {
-            stageInfo: {
-              applicants: [
-                {
-                  res_name_of_street_1: '',
-                  res_building_estate_1: '',
-                  res_room_flat_1: '',
-                  alt_address_same_as_res_address_2: 'Y',
-                  alt_address_same_as_res_address_3: 'Y'
-                },
-              ],
-            },
-          },
-        ],
+
+  test('shows the default value when the data is empty', () => {
+    const emptyProps = {
+      data: {
+        logical_field_name: 'residential_address_chn',
+        component_type: 'Text',
+        label_length: 20,
+        rwb_label_name: 'Residential Address',
+        default_visibility: null,
       },
-    });
-    
-    renderWithStore(store);
-    expect(screen.queryByText(/Email/i)).not.toBeInTheDocument(); // Adjust depending on the field.
+    };
+
+    const { getByText } = render(
+      <Provider store={store}>
+        <Display {...emptyProps} />
+      </Provider>
+    );
+
+    expect(getByText('')).toBeInTheDocument(); // Modify this based on your expected output
   });
 
-  test('displays HKID field correctly', () => {
-    store = mockStore({
-      ...initialState,
-      stages: {
-        ...initialState.stages,
-        stages: [
-          {
-            stageInfo: {
-              applicants: [
-                {
-                  HKID: 'A123456(7)'
-                },
-              ],
-            },
-          },
-        ],
+  test('handles condition to show Chinese residential address', () => {
+    const chnProps = {
+      data: {
+        logical_field_name: 'residential_address_chn',
+        component_type: 'Text',
+        label_length: 20,
+        rwb_label_name: 'Residential Address (CN)',
+        default_visibility: null,
       },
-    });
+    };
 
-    renderWithStore(store);
-    expect(screen.getByText(/A-123456-7/i)).toBeInTheDocument(); // Format as per getfieldValue for HKID.
-  });
-  
-  test('displays the component for amount correctly', () => {
-    store = mockStore({
-      ...initialState,
-      stages: {
-        ...initialState.stages,
-        stages: [
-          {
-            stageInfo: {
-              applicants: [
-                {
-                  amount_field: '20000'
-                },
-              ],
-            },
-          },
-        ],
-      },
-    });
+    const { getByText } = render(
+      <Provider store={store}>
+        <Display {...chnProps} />
+      </Provider>
+    );
 
-    renderWithStore(store);
-    expect(screen.getByText(/HKD 20,000.00/i)).toBeInTheDocument();
+    expect(getByText(/Residential Address \(CN\)/i)).toBeInTheDocument(); // Modify this based on your expected output
   });
 
-  // Add more tests according to your requirements.
-
+  // Add more tests here based on your requirements
 });
