@@ -1,125 +1,97 @@
+// Text.test.tsx
 import React from 'react';
-import { render, fireEvent, screen } from '@testing-library/react';
+import { render, fireEvent } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import { createStore } from 'redux';
-import Text from './Text'; // Adjust the import path as necessary
-import rootReducer from '../../../utils/store'; // Adjust the import path as necessary
+import configureStore from 'redux-mock-store';
+import Text from './Text'; // Adjust the import based on your folder structure
+import * as redux from 'react-redux';
 
-// Create a mock store for testing purposes
-const createMockStore = (initialState) => {
-  return createStore(rootReducer, initialState);
-};
-
-// Create a utility function to render component with store provider
-const renderWithStore = (component, store) => {
-  return render(
-    <Provider store={store}>{component}</Provider>
-  );
-};
+const mockStore = configureStore([]);
 
 describe('Text Component', () => {
-  let store;
+  let store: any;
 
   beforeEach(() => {
-    store = createMockStore({
-      // Initial mock state needed for your tests
+    store = mockStore({
       stages: {
-        stages: [
-          {
-            stageId: 'ad-1',
-            stageInfo: {
-              applicants: [
-                {
-                  related_party: 'Y',
-                  // Other applicant data...
-                }
-              ]
-            }
-          }
-        ],
+        stages: [{ stageId: 'ad-1' }],
         userInput: {
           applicants: [
             {
-              related_party: 'Y',
-              // Other user input fields...
-            }
-          ]
+              related_party: 'Y', // Example value
+              // other applicant properties as needed
+            },
+          ],
         },
-        pinyinToggle: false,
+        pinyinToggle: false, // Adjust if needed
       },
-      fielderror: {
-        error: {}
-      },
-      // Add other necessary slices of state...
+      fielderror: { error: {} },
+      // Add other slices here if required
+    });
+
+    jest.spyOn(redux, 'useDispatch').mockReturnValue(jest.fn()); // Mock useDispatch
+    jest.spyOn(redux, 'useSelector').mockImplementation((selector) => {
+      return selector(store.getState());
     });
   });
 
-  test('renders Text component and shows placeholder', () => {
-    const props = {
-      data: {
-        logical_field_name: 'test_field',
-        rwb_label_name: 'Test Field',
-        ui_defaulted_value: '',
-        type: 'text',
-        mandatory: 'Yes',
-        length: 100,
-        // Add other necessary props...
-      },
-      handleCallback: jest.fn(),
-      handleFieldDispatch: jest.fn(),
-    };
-
-    renderWithStore(<Text {...props} />, store);
-
-    const inputElement = screen.getByLabelText('test_field');
-    expect(inputElement).toBeInTheDocument();
-    expect(inputElement).toHaveAttribute('placeholder', ''); // Update according to your logic for placeholder
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
-  test('shows error message on empty mandatory field', () => {
-    const props = {
-      data: {
-        logical_field_name: 'test_field',
-        rwb_label_name: 'Test Field',
-        ui_defaulted_value: '',
-        type: 'text',
-        mandatory: 'Yes',
-        length: 100,
-      },
-      handleCallback: jest.fn(),
-      handleFieldDispatch: jest.fn(),
-    };
+  it('renders without crashing', () => {
+    const { getByLabelText } = render(
+      <Provider store={store}>
+        <Text data={{
+          logical_field_name: 'first_name',
+          rwb_label_name: 'First Name',
+          type: 'text',
+          mandatory: 'Yes',
+          ui_defaulted_value: ''
+        }} handleCallback={jest.fn()} handleFieldDispatch={jest.fn()} />
+      </Provider>
+    );
 
-    renderWithStore(<Text {...props} />, store);
-
-    const inputElement = screen.getByLabelText('test_field');
-    fireEvent.blur(inputElement); // Trigger the blur event to validate input
-
-    expect(screen.getByText(/required/i)).toBeInTheDocument(); // Replace with your actual error message
+    expect(getByLabelText('first_name')).toBeInTheDocument();
   });
 
-  test('dispatches action on input change', () => {
-    const props = {
-      data: {
-        logical_field_name: 'test_field',
-        rwb_label_name: 'Test Field',
-        ui_defaulted_value: '',
-        type: 'text',
-        mandatory: 'Yes',
-        length: 100,
-      },
-      handleCallback: jest.fn(),
-      handleFieldDispatch: jest.fn(),
-    };
+  it('shows an error message when the input is empty and is mandatory', () => {
+    const { getByLabelText, getByTitle } = render(
+      <Provider store={store}>
+        <Text data={{
+          logical_field_name: 'first_name',
+          rwb_label_name: 'First Name',
+          type: 'text',
+          mandatory: 'Yes',
+          ui_defaulted_value: ''
+        }} handleCallback={jest.fn()} handleFieldDispatch={jest.fn()} />
+      </Provider>
+    );
 
-    renderWithStore(<Text {...props} />, store);
+    const input = getByLabelText('first_name');
+    fireEvent.blur(input); // Simulate the blur event to trigger validation
 
-    const inputElement = screen.getByLabelText('test_field');
-    fireEvent.change(inputElement, { target: { value: 'New Value' } });
-
-    expect(screen.getByDisplayValue('New Value')).toBeInTheDocument();
+    expect(getByTitle('error-msg')).toHaveTextContent('First Name is required'); // Adjust based on your error handling logic
   });
 
-  // Add more test cases...
+  it('updates the input value correctly', () => {
+    const { getByLabelText } = render(
+      <Provider store={store}>
+        <Text data={{
+          logical_field_name: 'first_name',
+          rwb_label_name: 'First Name',
+          type: 'text',
+          ui_defaulted_value: ''
+        }} handleCallback={jest.fn()} handleFieldDispatch={jest.fn()} />
+      </Provider>
+    );
+
+    const input = getByLabelText('first_name');
+    fireEvent.change(input, { target: { value: 'John' } });
+
+    expect(input.value).toBe('John');
+  });
+
+  // Additional tests for other error cases, validation and input types can be added here
 
 });
