@@ -1,97 +1,80 @@
-import React from 'react';
-import { render } from '@testing-library/react';
-import { Provider } from 'react-redux';
-import { createStore } from 'redux';
-import Display from './Display';
-import { mockedStore } from './mockedStore'; // You'll need to create a mocked store
+import React from "react";
+import { render, screen } from "@testing-library/react";
+import { useSelector } from "react-redux";
+import Display from "./Display"; // Adjust the import path accordingly
 
-// Create a simple reducer to support the mocked store
-const initialState = {
+// Mocking the Redux hooks
+jest.mock("react-redux", () => ({
+  useSelector: jest.fn(),
+}));
+
+// Sample mock data
+const mockState = {
   stages: {
-    stages: [{ stageInfo: { applicants: [{ res_name_of_street_1: '', res_building_estate_1: '', res_room_flat_1: '', alt_address_same_as_res_address_2: 'N' }] }] }],
-    userInput: { applicants: [{ res_name_of_street_1: '', res_building_estate_1: '', res_room_flat_1: '' }] },
+    stages: [{ stageInfo: { applicants: [{ /* your applicant data here */ }] } }],
   },
-  lovDesc: {},
+  lovDesc: {/* your lovDesc mock data */},
 };
 
-const rootReducer = (state = initialState, action) => {
-  switch (action.type) {
-    default:
-      return state;
-  }
-};
-
-const store = createStore(rootReducer);
-
-// Create a mock function for the props
-const mockProps = {
-  data: {
-    logical_field_name: 'residential_address_chn',
-    component_type: 'Text',
-    label_length: 20,
-    rwb_label_name: 'Residential Address',
-    default_visibility: null,
-  },
-};
-
-describe('Display Component', () => {
-  test('renders without crashing', () => {
-    render(
-      <Provider store={store}>
-        <Display {...mockProps} />
-      </Provider>
-    );
+// Test suite
+describe("Display Component", () => {
+  // Resetting mocks before each test
+  beforeEach(() => {
+    useSelector.mockImplementation((selector) => selector(mockState));
   });
 
-  test('displays the correct label', () => {
-    const { getByText } = render(
-      <Provider store={store}>
-        <Display {...mockProps} />
-      </Provider>
-    );
-
-    expect(getByText(/Residential Address/i)).toBeInTheDocument();
-  });
-
-  test('shows the default value when the data is empty', () => {
-    const emptyProps = {
+  it("should render correctly when given valid props", () => {
+    // Setup mock data for props
+    const mockProps = {
       data: {
-        logical_field_name: 'residential_address_chn',
-        component_type: 'Text',
-        label_length: 20,
-        rwb_label_name: 'Residential Address',
+        logical_field_name: "annual_income_pl",
+        component_type: "Amount",
+        rwb_label_name: "Annual Income",
+        label_length: 38,
         default_visibility: null,
       },
     };
 
-    const { getByText } = render(
-      <Provider store={store}>
-        <Display {...emptyProps} />
-      </Provider>
-    );
+    render(<Display {...mockProps} />);
 
-    expect(getByText('')).toBeInTheDocument(); // Modify this based on your expected output
+    const labelElement = screen.getByText(/Annual Income/i);
+    expect(labelElement).toBeInTheDocument();
+
+    const valueElement = screen.getByText(/HKD \d{1,3}(,\d{3})*\.\d{2}/);
+    expect(valueElement).toBeInTheDocument();
   });
 
-  test('handles condition to show Chinese residential address', () => {
-    const chnProps = {
+  it("should not render when logical field name is on noFieldDisplay", () => {
+    const mockProps = {
       data: {
-        logical_field_name: 'residential_address_chn',
-        component_type: 'Text',
-        label_length: 20,
-        rwb_label_name: 'Residential Address (CN)',
-        default_visibility: null,
+        logical_field_name: "us_resident",
+        component_type: "text",
       },
     };
 
-    const { getByText } = render(
-      <Provider store={store}>
-        <Display {...chnProps} />
-      </Provider>
-    );
+    render(<Display {...mockProps} />);
 
-    expect(getByText(/Residential Address \(CN\)/i)).toBeInTheDocument(); // Modify this based on your expected output
+    const displayDiv = screen.queryByText(/us_resident/i);
+    expect(displayDiv).not.toBeInTheDocument();
   });
 
-  // Add more tests here based on your requirements
+  it("should correctly handle the mailing address conditional logic", () => {
+    // Update the mockState with data relevant to this test
+    mockState.stages.stages[0].stageInfo.applicants[0].alt_address_same_as_res_address_2 = "N";
+    mockState.stages.stages[0].stageInfo.applicants[0].res_name_of_street_3 = null; // Add more state whatever necessary
+
+    const mockProps = {
+      data: {
+        logical_field_name: "mailing_address_chn",
+        component_type: "text",
+        rwb_label_name: "Mailing Address (CHN)",
+      },
+    };
+
+    render(<Display {...mockProps} />);
+    const mailDisplay = screen.getByText(/Mailing Address \(CHN\)/i);
+    expect(mailDisplay).toBeInTheDocument();
+  });
+
+  // Add more test cases as necessary...
 });
