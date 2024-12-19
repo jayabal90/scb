@@ -1,531 +1,294 @@
-import { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import validateService from "../../../services/validation-service";
-import { fieldError, isFieldUpdate, fieldIdAppend, getUrl } from "../../../utils/common/change.utils";
-import { KeyWithAnyModel, StoreModel } from "../../../utils/model/common-model";
-import "./dates.scss";
-import errorMsg from "../../../assets/_json/error.json";
-import { userAgeAction } from "../../../utils/store/age-slice";
+import { useSelector } from "react-redux";
+import {
+  KeyWithAnyModel,
+  /*LovInputValRPModel,*/ StoreModel,
+} from "../../../utils/model/common-model";
+import {
+  GetLovDesc,
+  resAddressEng,
+} from "../../../modules/dashboard/review-page/review-page.utils";
+import "./display.scss";
 import { CONSTANTS } from "../../../utils/common/constants";
-import { lastAction } from "../../../utils/store/last-accessed-slice";
-import { fieldErrorAction } from "../../../utils/store/field-error-slice";
-import { nodeModuleNameResolver } from "typescript";
-// import 'font-awesome/css/font-awesome.min.css';
+import { getUrl } from "../../../utils/common/change.utils";
+import { useEffect, useState } from "react";
+import closeIcon from "../../../modules/preApproval/images/icon-cross-black@3x.png";
 
-export const Date = (props: KeyWithAnyModel) => {
-  const [date, setDate] = useState({ DD: "", MM: "", YYYY: "" });
-  const [dateVal, setDateVal] = useState("");
+const Display = (props: KeyWithAnyModel) => {
   const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
-  const [tickMark, setTickMark] = useState(false);
- 
-  const [error, setError] = useState('');
-  const dispatch = useDispatch();
-  const fieldErrorSelector = useSelector(
-    (state: StoreModel) => state.fielderror.error
+  const lovDescSelector = useSelector((state: StoreModel) => state.lovDesc);
+  const userInputSelector = useSelector(
+    (state: StoreModel) => state.stages.userInput
   );
-  const applicantsSelector = useSelector(
-    (state: StoreModel) => state.stages.userInput.applicants[0]
-  );
-  const language = getUrl.getLanguageInfo("lang")
+  const language = getUrl.getLanguageInfo("lang");
+  const [ChnResDisplay, setChnResDisplay] = useState(false);
+  const [ChnMailDisplay, setChnMailDisplay] = useState(false);
 
-  const workType=applicantsSelector.work_type;
   useEffect(() => {
-
-    if (stageSelector && stageSelector[0] && stageSelector[0].stageInfo && stageSelector[0].stageInfo.applicants[0]) {
-      const storeDate =
-        stageSelector[0].stageInfo.applicants[0][
-        props.data.logical_field_name
-        ];
-      if (storeDate) {
-        let splitDate = storeDate.split("-");
-        setDate({ DD: splitDate[2], MM: splitDate[1], YYYY: splitDate[0] });
+    if (
+      props.data &&
+      props.data.logical_field_name === "residential_address_chn" &&
+      (userInputSelector?.applicants?.[0]?.res_name_of_street_1 === null ||
+        userInputSelector?.applicants?.[0]?.res_name_of_street_1 === undefined ||
+        userInputSelector?.applicants?.[0]?.res_name_of_street_1 === "") &&
+      (userInputSelector?.applicants?.[0]?.res_building_estate_1 === null ||
+        userInputSelector?.applicants?.[0]?.res_building_estate_1 === undefined ||
+        userInputSelector?.applicants?.[0]?.res_building_estate_1 === "") &&
+      (userInputSelector?.applicants?.[0]?.res_room_flat_1 === null ||
+        userInputSelector?.applicants?.[0]?.res_room_flat_1 === undefined ||
+        userInputSelector?.applicants?.[0]?.res_room_flat_1 === "")
+    ) {
+      setChnResDisplay(true);
+    } else if (
+      props.data &&
+      props.data.logical_field_name === "mailing_address_chn" &&
+      (userInputSelector.applicants[0].alt_address_same_as_res_address_2 ===
+        "N" ||
+        userInputSelector.applicants[0].alt_address_same_as_res_address_3 ===
+          "N")
+    ) {
+      if (
+        (userInputSelector.applicants[0].res_name_of_street_3 === null ||
+          userInputSelector.applicants[0].res_name_of_street_3 === undefined ||
+          userInputSelector.applicants[0].res_name_of_street_3 === "") &&
+        (userInputSelector.applicants[0].res_room_flat_3 === null ||
+          userInputSelector.applicants[0].res_room_flat_3 === undefined ||
+          userInputSelector.applicants[0].res_room_flat_3 === "") &&
+        (userInputSelector.applicants[0].res_building_estate_3 === null ||
+          userInputSelector.applicants[0].res_building_estate_3 === undefined ||
+          userInputSelector.applicants[0].res_building_estate_3 === "")
+      ) {
+        setChnMailDisplay(true);
+      }
+    } else if (
+      props.data &&
+      props.data.logical_field_name === "mailing_address_chn" &&
+      (userInputSelector.applicants[0].alt_address_same_as_res_address_2 ===
+        "Y" ||
+        userInputSelector.applicants[0].alt_address_same_as_res_address_3 ===
+          "Y")
+    ) {
+      if (
+        (userInputSelector.applicants[0].res_name_of_street_1 === null ||
+          userInputSelector.applicants[0].res_name_of_street_1 === undefined ||
+          userInputSelector.applicants[0].res_name_of_street_1 === "") &&
+        (userInputSelector.applicants[0].res_room_flat_1 === null ||
+          userInputSelector.applicants[0].res_room_flat_1 === undefined ||
+          userInputSelector.applicants[0].res_room_flat_1 === "") &&
+        (userInputSelector.applicants[0].res_building_estate_1 === null ||
+          userInputSelector.applicants[0].res_building_estate_1 === undefined ||
+          userInputSelector.applicants[0].res_building_estate_1 === "")
+      ) {
+        setChnMailDisplay(true);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, []);
 
-  const changeHandler = (
-    data: React.ChangeEvent<HTMLInputElement>,
-    type: string
-  ) => {
-    setError('');
-    let nextfield = null;
-    const { maxLength, value } = data.target;
-    if (value.length >= maxLength) {
-      if (type === 'MM') {
-        if (Number(data.target.value) <= 12) {
-          nextfield = document.querySelector(
-            `input[name=${props.data.logical_field_name}_yyyy]`
-          ) as HTMLInputElement | null;
-        }
-      } else if (type === 'DD') {
-        nextfield = document.querySelector(
-          `input[name=${props.data.logical_field_name}_mm]`
-        ) as HTMLInputElement | null;
+  const getfieldValue = () => {
+    let fieldValue = "";
+    if (props.data) {
+      if (props.data.component_type === "Amount") {
+        fieldValue =
+          "HKD " +
+          userInputSelector.applicants[0][
+            props.data.logical_field_name
+          ].replace(/\B(?=(\d{3})+(?!\d))/g, ",") +
+          ".00";
+        return fieldValue;
       }
-    }
-    if (nextfield !== null) {
-      nextfield.focus();
-    }
-    const fieldName = props.data.logical_field_name;
-    if (type === 'YYYY') {
-      date["YYYY"] = data.target.value;
-    } else if (type === 'MM') {
-      date["MM"] = data.target.value;
-    } else if (type === 'DD') {
-      date["DD"] = data.target.value;
-    }
-    else {
-      date["YYYY"] = data.target.value.split("-")[0];
-      date["MM"] = data.target.value.split("-")[1];
-      date["DD"] = data.target.value.split("-")[2];
-    }
-
-    const userValue = type === 'date' ? data.target.value : date["YYYY"] + "-" + date["MM"] + "-" + date["DD"];
-    let splitDate = userValue.split("-");
-    setDate({ DD: splitDate[2], MM: splitDate[1], YYYY: splitDate[0] });
-    setDateVal(userValue);
-    console.log(date);
-    if (Number(date["MM"]) > 12) {
-      setTickMark(false)
-      setError('Month is not valid');
-      dispatch(
-        fieldErrorAction.getFieldError({
-          fieldName: props.data.logical_field_name,
-        })
-      );
-      return
-    }
-    let year = Number(date["YYYY"]);
-    let isLeap = ((year % 4 == 0) && (year % 100 != 0)) || (year % 400 == 0);
-    console.log(isLeap)
-    if (isLeap && Number(date["DD"]) > 29 && Number(date["MM"]) === 2) {
-      setTickMark(false)
-      setError('Date is not valid');
-      dispatch(
-        fieldErrorAction.getFieldError({
-          fieldName: props.data.logical_field_name,
-        })
-      );
-      return
-    }
-    if (!isLeap && Number(date["DD"]) > 28 && Number(date["MM"]) === 2) {
-      setTickMark(false)
-      setError('Date is not valid');
-      dispatch(
-        fieldErrorAction.getFieldError({
-          fieldName: props.data.logical_field_name,
-        })
-      );
-      return
-    }
-    if (date["YYYY"].length !== 4) {
-      setTickMark(false)
-      setError('Year format wrong');
-      dispatch(
-        fieldErrorAction.getFieldError({
-          fieldName: props.data.logical_field_name,
-        }));
-    }
-    else if (date["MM"].length !== 2) {
-      setTickMark(false)
-      setError('Month format wrong');
-      dispatch(
-        fieldErrorAction.getFieldError({
-          fieldName: props.data.logical_field_name,
-        }));
-    }
-    else if (date["DD"].length !== 2) {
-      setTickMark(false)
-      setError('Day format wrong');
-      dispatch(
-        fieldErrorAction.getFieldError({
-          fieldName: props.data.logical_field_name,
-        }));
-    }
-    else {
-      setTickMark(true)
-      setError('');
-      dispatch(
-        fieldErrorAction.removeToggleFieldError(
-          props.data.logical_field_name,
-        ));
-    }
-    // console.log(date);
-    // const userValue = type === 'date' ? data.target.value : date["YYYY"] + "-" + date["MM"] + "-" + date["DD"];
-    // console.log(userValue);
-    debugger;
-    if (userValue.length !== 10) {
-      setTickMark(false)
-      dispatch(
-        fieldErrorAction.getFieldError({
-          fieldName: props.data.logical_field_name,
-        }));
-    } else {
-      setTickMark(true)
-      dispatch(
-        fieldErrorAction.removeToggleFieldError(
-          props.data.logical_field_name,
-        ));
-
-    }
-    props.handleCallback(props.data, userValue);
-    props.handleFieldDispatch?.(props?.data?.logical_field_name, userValue);
-    if (date["DD"] !== "" || date["MM"] !== "" || date["YYYY"] !== "") {
-      if (date["YYYY"].length > 3 && date["DD"].length > 1 && date["MM"].length > 1) {
-        if (validateService.isValidDate(userValue)) {
-
-          /* Conditions for expiry date*/
-          if (props.data.logical_field_name === 'expiry_date') {
-            let isGreaterThanThirtyDays = validateService.calculateMonth(userValue);
-            if (!isGreaterThanThirtyDays) {
-              if (applicantsSelector.id_type_cb === "Exit-Entry Permit")
-                setError(`${language === CONSTANTS.LANG_EN ? errorMsg.expiry_EEP : language === CONSTANTS.LANG_CN ? errorMsg.expiry_EEP_CN : errorMsg.expiry_EEP_HK}`);
-              else if (applicantsSelector.id_type_cb === "Passport")
-                setError(`${language === CONSTANTS.LANG_EN ? errorMsg.expiry_PASSPORT : language === CONSTANTS.LANG_CN ? errorMsg.expiry_PASSPORT_CN : errorMsg.expiry_PASSPORT_HK}`);
-            } else
-              dispatch(isFieldUpdate(props, userValue, fieldName));
+      if (props.data.logical_field_name === "annual_income_pl") {
+        fieldValue =
+          "HKD " +
+          userInputSelector.applicants[0][
+            props.data.logical_field_name
+          ].replace(/\B(?=(\d{3})+(?!\d))/g, ",") +
+          ".00";
+        return fieldValue;
+      }
+      if (props.data.logical_field_name === "marketing_questionaires") {
+        console.log(userInputSelector.applicants[0]
+          ,'userInputSelector.applicants[0].marketing_email')
+          if(userInputSelector.applicants[0].marketing_email==='Y'){
+            fieldValue +='Email'
           }
-
-          /**Validation for date of birth */
-          else if (props.data.logical_field_name === 'date_of_birth') {
-            let age = validateService.calculateAge(userValue);
-            if (age > 99) {
-              setError(`${language === CONSTANTS.LANG_EN ? errorMsg.patterns : language === CONSTANTS.LANG_CN ? errorMsg.patterns_CN : errorMsg.patterns_HK}${props.data.rwb_label_name}`);
-              dispatch(
-                fieldErrorAction.getFieldError({
-                  fieldName: props.data.logical_field_name,
-                }));
-            } else if (age < 18) {
-              dispatch(
-                fieldErrorAction.getFieldError({
-                  fieldName: props.data.logical_field_name,
-                }));
-              setError(`${language === CONSTANTS.LANG_EN ? errorMsg.patterns : language === CONSTANTS.LANG_CN ? errorMsg.patterns_CN : errorMsg.patterns_HK}${props.data.rwb_label_name}`);
-            } else {
-              dispatch(userAgeAction.addUserAge({ userAge: age }))
-              dispatch(isFieldUpdate(props, userValue, fieldName));
-            }
+          if(userInputSelector.applicants[0].marketing_mobile_message==='Y'){
+            if(fieldValue) fieldValue += ', ';
+            fieldValue +='Mobile Message' 
           }
-        }
-        else {
-          if (props.data.logical_field_name === 'expiry_date') {
-            setError(`${language === CONSTANTS.LANG_EN ? errorMsg.patterns : language === CONSTANTS.LANG_CN ? errorMsg.patterns_CN : errorMsg.patterns_HK}${props.data.rwb_label_name}`);
-
-          } else {
-            setError(`${language === CONSTANTS.LANG_EN ? errorMsg.emity : language === CONSTANTS.LANG_CN ? errorMsg.emity_CN : errorMsg.emity_HK}${props.data.rwb_label_name}`);
+          if(userInputSelector.applicants[0].marketing_phone_others==='Y'){
+            if(fieldValue) fieldValue += ', ';
+            fieldValue +='Phone Call (except calls from Relationship Managers or Premium Executive)' 
           }
-        }
+          if(userInputSelector.applicants[0].marketing_post==='Y'){
+            if(fieldValue) fieldValue += ', ';
+            fieldValue +='Post' 
+          }
+          if(userInputSelector.applicants[0].marketing_phone_all==='Y'){
+            if(fieldValue) fieldValue += ', ';
+            fieldValue +='Phone Call (all calls)' 
+          }
+        return fieldValue;
+      }
+      if (props.data.logical_field_name === "HKID") {
+        fieldValue =
+          userInputSelector.applicants[0][props.data.logical_field_name][0] +
+          "-" +
+          userInputSelector.applicants[0][
+            props.data.logical_field_name
+          ].substring(
+            1,
+            userInputSelector.applicants[0][props.data.logical_field_name]
+              .length - 1
+          ) +
+          "-" +
+          userInputSelector.applicants[0][props.data.logical_field_name][
+            userInputSelector.applicants[0][props.data.logical_field_name]
+              .length - 1
+          ];
+        return fieldValue;
+      }
+      if (props.data.component_type === "Phone") {
+        fieldValue = userInputSelector.applicants[0][
+          props.data.logical_field_name
+        ]
+          ? "+" + userInputSelector.applicants[0][props.data.logical_field_name]
+          : "";
+        return fieldValue;
+      }
+      if(props.data.logical_field_name === "apply_for_pl") {
+        fieldValue= "STANDARD CHARTERED PERSONAL INSTALMENT LOAN"
+        return fieldValue;
+      }
+      if (props.data.lov === "Yes") {
+        console.log(stageSelector[0].stageInfo.applicants[0][
+          props.data.logical_field_name + "_a_1"
+        ])
+        console.log(lovDescSelector)
+        fieldValue = GetLovDesc(
+          stageSelector[0].stageInfo.applicants[0][
+            props.data.logical_field_name + "_a_1"
+          ],
+          lovDescSelector,
+          props.data.logical_field_name
+        );
+        console.log(fieldValue)
+        return fieldValue;
       } else {
-        if (props.data.logical_field_name === 'expiry_date') {
-          setError(`${language === CONSTANTS.LANG_EN ? errorMsg.patterns : language === CONSTANTS.LANG_CN ? errorMsg.patterns_CN : errorMsg.patterns_HK}${props.data.rwb_label_name}`);
-
-        } else {
-          setError(`${language === CONSTANTS.LANG_EN ? errorMsg.emity : language === CONSTANTS.LANG_CN ? errorMsg.emity_CN : errorMsg.emity_HK}${props.data.rwb_label_name}`);
-        }
-      }
-    }
-    else if (props.data.mandatory === "Yes" || props.data.mandatory === "Conditional") {
-      if (props.data.logical_field_name === 'expiry_date') {
-        setError(`${language === CONSTANTS.LANG_EN ? errorMsg.patterns : language === CONSTANTS.LANG_CN ? errorMsg.patterns_CN : errorMsg.patterns_HK}${props.data.rwb_label_name}`);
-
-      } else {
-        setError(`${language === CONSTANTS.LANG_EN ? errorMsg.emity : language === CONSTANTS.LANG_CN ? errorMsg.emity_CN : errorMsg.emity_HK}${props.data.rwb_label_name}`);
+        fieldValue = userInputSelector.applicants[0][props.data.logical_field_name];
+        return fieldValue;
       }
     }
   };
 
-  const bindHandler = (data: any, type: string) => {
-    if ((type === "DD" || type === "MM") && data.target.value && parseInt(data.target.value) > 0 && (data.target.value).length < 2) {
-      date[type] = `0${data.target.value}`;
-      data.target.value = date[type];
-      changeHandler(data, type);
-    }
-  };
-
-  useEffect(() => {
-    if (stageSelector && stageSelector[0] && stageSelector[0].stageInfo && stageSelector[0].stageInfo.applicants[0]) {
-      const storeDate =
-        stageSelector[0].stageInfo.applicants[0][
-        props.data.logical_field_name
-        ];
-      if (storeDate) {
-        let splitDate = storeDate.split("-");
-        setDate({ DD: splitDate[2], MM: splitDate[1], YYYY: splitDate[0] });
-      }
-    }
-  }, [stageSelector, props.data && props.data.logical_field_name]);
-
-  useEffect(() => {
-    if (props.data && props.data.logical_field_name === 'expiry_date') {
-      if (applicantsSelector.expiry_date) {
-        setDate({ DD: "", MM: "", YYYY: "" });
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applicantsSelector.id_type_cb])
-
-  useEffect(() => {
-    //setErrors(fieldError(fieldErrorSelector, props));
-    if (fieldError(fieldErrorSelector, props)) {
-      if (props.data.logical_field_name === 'expiry_date') {
-        setError(`${language === CONSTANTS.LANG_EN ? errorMsg.patterns : language === CONSTANTS.LANG_CN ? errorMsg.patterns_CN : errorMsg.patterns_HK}${props.data.rwb_label_name}`);
-
-      } else {
-        setError(`${language === CONSTANTS.LANG_EN ? errorMsg.emity : language === CONSTANTS.LANG_CN ? errorMsg.emity_CN : errorMsg.emity_HK}${props.data.rwb_label_name}`);
-      }
-    } else {
-      setError('');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fieldErrorSelector]);
-
-  const allowOnlyCharacter = (event: React.KeyboardEvent<HTMLInputElement>, fieldName: string) => {
-    validateService.allowOnlyCharacter(event, fieldName);
-  };
-
-  useEffect(() => {
-    if (error === (language === CONSTANTS.LANG_EN ? errorMsg.expiry_EEP : language === CONSTANTS.LANG_CN ? errorMsg.expiry_EEP_CN : errorMsg.expiry_EEP_HK))
-      setError(`${language === CONSTANTS.LANG_EN ? errorMsg.expiry_PASSPORT : language === CONSTANTS.LANG_CN ? errorMsg.expiry_PASSPORT_CN : errorMsg.expiry_PASSPORT_HK}`);
-    else if (error === (language === CONSTANTS.LANG_EN ? errorMsg.expiry_PASSPORT : language === CONSTANTS.LANG_CN ? errorMsg.expiry_PASSPORT_CN : errorMsg.expiry_PASSPORT_HK))
-      setError(`${language === CONSTANTS.LANG_EN ? errorMsg.expiry_EEP : language === CONSTANTS.LANG_CN ? errorMsg.expiry_EEP_CN : errorMsg.expiry_EEP_HK}`);
-    if (props.data && props.data.logical_field_name === 'expiry_date') {
-      if (applicantsSelector.expiry_date) {
-        setDate({ DD: "", MM: "", YYYY: "" });
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applicantsSelector.id_type_cb])
-
-  const focusHandler = (
-    fieldName: string,
-    event: React.FocusEvent<HTMLInputElement>
-  ) => {
-    dispatch(lastAction.getField(fieldName));
-  };
+  const logicalName=props.data?.logical_field_name;
+  let noFieldDisplay=false;
+  if(logicalName){
+    noFieldDisplay = props && props.data &&
+      props.data.logical_field_name === "integrated_deposit_account" ||
+      props.data.logical_field_name === "us_resident" ||
+      props.data.logical_field_name === "us_citizen" ||
+      props.data.logical_field_name === "education_level" ||
+      props.data.logical_field_name === "green_card_holder" ||
+      props.data.logical_field_name === "home_phone_number" ||
+      props.data.logical_field_name === "place_of_birth" ||
+      props.data.logical_field_name === "purpose_of_account" ||
+      props.data.logical_field_name === "tax_resident_of_any_country_region" ||
+      props.data.logical_field_name === "tin_hkid" ||
+      props.data.logical_field_name === "tax_resident_other_countries_regions" ||
+      props.data.logical_field_name === "referral_pl" ||
+      props.data.logical_field_name === "credit_limit_extension" ||
+      props.data.logical_field_name === "atm_service" ||
+      props.data.logical_field_name === "atm_account_number_1" ||
+      props.data.logical_field_name === "atm_account_number_2" || 
+      props.data.logical_field_name === "estatement"
+  }
+  if(props.data.logical_field_name === "monthly_installment_mortgage_payment" && userInputSelector.applicants[0]["other_loans"] === "N") {
+    noFieldDisplay =true
+  }
+  if(props.data.logical_field_name === "total_outstanding_other_loan_amount" && userInputSelector.applicants[0]["other_loans"] === "N") {
+    noFieldDisplay =true
+  }
+  if(props.data.logical_field_name === "total_outstanding_other_monthly_payment" && userInputSelector.applicants[0]["other_loans"] === "N") {
+    noFieldDisplay =true
+  }
+  if(props.data.logical_field_name === "name_of_related_person" && userInputSelector.applicants[0]["related_party"] === "N") {
+    noFieldDisplay =true
+  }
+  if(props.data.logical_field_name === "relationship_of_related_person" && userInputSelector.applicants[0]["related_party"] === "N") {
+    noFieldDisplay =true
+  }
 
   return (
     <>
-      {(stageSelector[0].stageId === 'ad-2' &&
-        workType === 'E002' || workType === 'E001' || workType === 'E103' || workType === 'E104') &&
-        props && props.data &&
-        <div className="date">
-          <label htmlFor={props.data.logical_field_name} className="text-label tick-enabled">
-            {!error && tickMark &&
-              <div className="tick-class"></div>
-            }
-            {/* {!error && tickMark ? 
-          <span  className='span-align'>
-              {props.data.rwb_label_name}
-          </span>
-          :
-          <span>
-              {props.data.rwb_label_name}
-          </span>
-          } */}
-            <span> {props.data.rwb_label_name}</span>
+    {noFieldDisplay ? "":
+      <div className="display">
+        {props &&
+          props.data &&
+          props.data.component_type !== "authorize" &&
+          props.data.default_visibility === null && (
+            <>
+              <label
+               title="display_label_rp"
+                htmlFor={props.data.logical_field_name}
+                className="display_label_rp"
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "5px 10px 0 0",
+                    lineHeight: "30px",
+                  }}
+                >
+                  {props.data.label_length == 38 && (
+                    <span className="banner-icon"></span>
+                  )}
 
-            {/* {props.data.rwb_label_name} */}
-          </label>
-          <div className="date__inputs" id={fieldIdAppend(props)}>
-            {/* <div className="input-group__input d-flex align-items-center justify-content-between" id={fieldIdAppend(props)}> */}
-            <input
-              placeholder="DD"
-              minLength={2}
-              maxLength={2}
-              type="tel"
-              value={date.DD}
-              // required={
-              //   props.data.mandatory === "Yes" || "Conditional" ? true : false
-              // }
-              onChange={(event) => changeHandler(event, "DD")}
-              onKeyPress={(event) =>
-                allowOnlyCharacter(event, props.data.logical_field_name)
-              }
-              onBlur={(event) => bindHandler(event, "DD")}
-              onFocus={focusHandler.bind(this, props.data.logical_field_name)}
-              disabled={props.data.editable}
-              className={error && 'input-error'}
-              name={props.data.logical_field_name + '_dd'}
-              id={props.data.logical_field_name + '_dd'}
-              autoComplete="off"
-            />
-            <span className="date-separators-m"></span>
-            <input
-              placeholder="MM"
-              minLength={2}
-              maxLength={2}
-              type="tel"
-              value={date.MM}
-              // required={
-              //   props.data.mandatory === "Yes" || "Conditional" ? true : false
-              // }
-              onChange={(event) => changeHandler(event, "MM")}
-              onKeyPress={(event) =>
-                allowOnlyCharacter(event, props.data.logical_field_name)
-              }
-              onBlur={(event) => bindHandler(event, "MM")}
-              onFocus={focusHandler.bind(this, props.data.logical_field_name)}
-              disabled={props.data.editable}
-              className={error && 'input-error'}
-              name={props.data.logical_field_name + '_mm'}
-              id={props.data.logical_field_name + '_mm'}
-              autoComplete="off"
-            />
-            <span className="date-separators-m"></span>
-            <input
-              title="year-input"
-              placeholder="YYYY"
-              minLength={4}
-              maxLength={4}
-              type="tel"
-              value={date.YYYY}
-              // required={
-              //   props.data.mandatory === "Yes" || "Conditional" ? true : false
-              // }
-              onChange={(event) => changeHandler(event, "YYYY")}
-              onKeyPress={(event) =>
-                allowOnlyCharacter(event, props.data.logical_field_name)
-              }
-              onFocus={focusHandler.bind(this, props.data.logical_field_name)}
-              disabled={props.data.editable}
-              className={error && 'input-error'}
-              name={props.data.logical_field_name + '_yyyy'}
-              id={props.data.logical_field_name + '_yyyy'}
-              autoComplete="off"
-            />
-            {/* <input
-            className="date_icon"
-           // placeholder="yyyy"
-            style={{width: 20}}
-            // minLength={4}
-            // maxLength={4}
-            type="date"
-            value={dateVal}
-            // required={
-            //   props.data.mandatory === "Yes" || "Conditional" ? true : false
-            // }
-            onChange={(event) => changeHandler(event, "date")}
-            // onKeyPress={(event) =>
-            //   allowOnlyCharacter(event, props.data.logical_field_name)
-            // }
-            // onFocus={focusHandler.bind(this, props.data.logical_field_name)}
-            // disabled={props.data.editable}
-            // className={error && 'input-error'}
-            // name={props.data.logical_field_name + '_yyyy'}
-            // id={props.data.logical_field_name + '_yyyy'}
-            // autoComplete="off"
-          /> */}
-          </div>
-        </div>
-      }
-      {(workType !== 'S103' && stageSelector[0].stageId === 'pd-1')&&
-        props && props.data &&
-        <div className="date">
-          <label htmlFor={props.data.logical_field_name} className="text-label tick-enabled">
-            {!error && tickMark &&
-              <div className="tick-class"></div>
-            }
-            <span> {props.data.rwb_label_name}</span>
+                  {props.data.rwb_label_name}
 
-            {/* {props.data.rwb_label_name} */}
-          </label>
-          <div className="date__inputs" id={fieldIdAppend(props)}>
-            {/* <div className="input-group__input d-flex align-items-center justify-content-between" id={fieldIdAppend(props)}> */}
-            <input
-              placeholder="DD"
-              minLength={2}
-              maxLength={2}
-              type="tel"
-              value={date.DD}
-              // required={
-              //   props.data.mandatory === "Yes" || "Conditional" ? true : false
-              // }
-              onChange={(event) => changeHandler(event, "DD")}
-              onKeyPress={(event) =>
-                allowOnlyCharacter(event, props.data.logical_field_name)
-              }
-              onBlur={(event) => bindHandler(event, "DD")}
-              onFocus={focusHandler.bind(this, props.data.logical_field_name)}
-              disabled={props.data.editable}
-              className={error && 'input-error'}
-              name={props.data.logical_field_name + '_dd'}
-              id={props.data.logical_field_name + '_dd'}
-              autoComplete="off"
-            />
-            <span className="date-separators-m"></span>
-            <input
-              placeholder="MM"
-              minLength={2}
-              maxLength={2}
-              type="tel"
-              value={date.MM}
-              // required={
-              //   props.data.mandatory === "Yes" || "Conditional" ? true : false
-              // }
-              onChange={(event) => changeHandler(event, "MM")}
-              onKeyPress={(event) =>
-                allowOnlyCharacter(event, props.data.logical_field_name)
-              }
-              onBlur={(event) => bindHandler(event, "MM")}
-              onFocus={focusHandler.bind(this, props.data.logical_field_name)}
-              disabled={props.data.editable}
-              className={error && 'input-error'}
-              name={props.data.logical_field_name + '_mm'}
-              id={props.data.logical_field_name + '_mm'}
-              autoComplete="off"
-            />
-            <span className="date-separators-m"></span>
-            <input
-              title="year-input"
-              placeholder="YYYY"
-              minLength={4}
-              maxLength={4}
-              type="tel"
-              value={date.YYYY}
-              // required={
-              //   props.data.mandatory === "Yes" || "Conditional" ? true : false
-              // }
-              onChange={(event) => changeHandler(event, "YYYY")}
-              onKeyPress={(event) =>
-                allowOnlyCharacter(event, props.data.logical_field_name)
-              }
-              onFocus={focusHandler.bind(this, props.data.logical_field_name)}
-              disabled={props.data.editable}
-              className={error && 'input-error'}
-              name={props.data.logical_field_name + '_yyyy'}
-              id={props.data.logical_field_name + '_yyyy'}
-              autoComplete="off"
-            />
-            {/* <input
-            className="date_icon"
-           // placeholder="yyyy"
-            style={{width: 20}}
-            // minLength={4}
-            // maxLength={4}
-            type="date"
-            value={dateVal}
-            // required={
-            //   props.data.mandatory === "Yes" || "Conditional" ? true : false
-            // }
-            onChange={(event) => changeHandler(event, "date")}
-            // onKeyPress={(event) =>
-            //   allowOnlyCharacter(event, props.data.logical_field_name)
-            // }
-            // onFocus={focusHandler.bind(this, props.data.logical_field_name)}
-            // disabled={props.data.editable}
-            // className={error && 'input-error'}
-            // name={props.data.logical_field_name + '_yyyy'}
-            // id={props.data.logical_field_name + '_yyyy'}
-            // autoComplete="off"
-          /> */}
-          </div>
-        </div>
-        }
-
-      {error && <div className="error-msg">{error}</div>}
+                  {props.data.label_length == 38 && (
+                    <div className="hk-headerclose-btnH">
+                      <img
+                        src={closeIcon}
+                        alt="close Icon"
+                        className="hk-headerclose-btn"
+                      />
+                    </div>
+                  )}
+                </div>
+              </label>
+              <p>
+                {props.data.logical_field_name === "res_address" ||
+                props.data.logical_field_name === "office_address"
+                  ? resAddressEng(
+                    userInputSelector,
+                    lovDescSelector,
+                    props.data.logical_field_name
+                    )
+                    : props.data.logical_field_name ===
+                      "product_service_information_request" ||
+                    props.data.logical_field_name ===
+                      "individual_customer_authority_and_identity"
+                  ? stageSelector[0].stageInfo.applicants[0][
+                    props.data.logical_field_name+"_a_1"
+                  ] === "Y"
+                  ? language === CONSTANTS.LANG_EN
+                  ? CONSTANTS.YES
+                  : language === CONSTANTS.LANG_CN
+                  ? "是"
+                  : "是"
+                  : language === CONSTANTS.LANG_EN
+                  ? CONSTANTS.NO
+                  : language === CONSTANTS.LANG_CN
+                  ? "否"
+                  : "否"
+                  : getfieldValue()}
+              </p>
+            </>
+          )}
+      </div>
+       } 
     </>
   );
 };
 
-export default Date;
+export default Display;
